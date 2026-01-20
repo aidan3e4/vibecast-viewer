@@ -175,7 +175,11 @@ def analyze_with_openai(image_base64, prompt, api_key):
             }
         ],
     )
-    return response.choices[0].message.content
+
+    content = response.choices[0].message.content
+    content = content.split("```JSON", 1)[-1].rsplit("```", 1)[0]
+    content = json.loads(content)
+    return content
 
 
 def capture_and_process(cam, output_dir, views_to_send, prompt, api_key, fov=90, output_size=(1080, 810)):
@@ -317,7 +321,7 @@ View codes:
     prompt = args.prompt  
     if not prompt:
         with open("prompt.txt") as tfile:
-            prompt = tfile.readlines() # TODO: check I open correctly
+            prompt = tfile.read()
 
     # Connect to camera
     print(f"Connecting to camera at {args.ip}...")
