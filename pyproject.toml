@@ -1,0 +1,50 @@
+[project]
+name = "reolinkapi"
+version = "0.4.1"
+description = "Reolink Camera API client written in Python 3"
+readme = "README.md"
+license = "GPL-3.0"
+authors = [
+    { name = "Benehiko", email = "alanoterblanche@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "dotenv>=0.9.9",
+    "ipykernel>=7.1.0",
+    "openai>=2.15.0",
+    "opencv-python>=4.13.0.90",
+    "pillow>=12.1.0",
+    "pysocks>=1.7.1",
+    "pyyaml>=6.0.2",
+    "requests>=2.32.3",
+]
+
+[project.optional-dependencies]
+streaming = [
+    "numpy>=2.0.1",
+    "opencv-python>=4.10.0",
+    "pillow>=10.4.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.4.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/ReolinkCameraAPI/reolinkapipy"
+Repository = "https://github.com/ReolinkCameraAPI/reolinkapipy"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["reolinkapi"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]
