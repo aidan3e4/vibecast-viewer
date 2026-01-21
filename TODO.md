@@ -1,0 +1,3 @@
+- test and fix the session thing: 
+    - test the backend
+    - test the UI visualization

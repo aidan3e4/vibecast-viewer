@@ -154,6 +154,39 @@ def save_image(img_np, filepath):
     cv2.imwrite(str(filepath), img_bgr)
 
 
+def create_session(output_dir, place=None):
+    """Create a new session folder with metadata."""
+    timestamp = datetime.now()
+    session_id = f"session_{timestamp.strftime('%Y%m%d_%H%M%S')}"
+    session_dir = output_dir / session_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+
+    metadata = {
+        'session_id': session_id,
+        'start_time': timestamp.isoformat(),
+        'end_time': None,
+        'place': place,
+        'capture_count': 0
+    }
+
+    metadata_path = session_dir / 'session_metadata.json'
+    with open(metadata_path, 'w') as f:
+        json.dump(metadata, f, indent=2)
+
+    return session_dir, metadata_path
+
+
+def update_session_metadata(metadata_path, **updates):
+    """Update session metadata file with new values."""
+    with open(metadata_path, 'r') as f:
+        metadata = json.load(f)
+
+    metadata.update(updates)
+
+    with open(metadata_path, 'w') as f:
+        json.dump(metadata, f, indent=2)
+
+
 def analyze_with_openai(image_base64, prompt, api_key):
     """Send image to OpenAI for analysis."""
     from openai import OpenAI
@@ -182,11 +215,9 @@ def analyze_with_openai(image_base64, prompt, api_key):
     return content
 
 
-def capture_and_process(cam, output_dir, views_to_send, prompt, api_key, fov=90, output_size=(1080, 810)):
+def capture_and_process(cam, session_dir, metadata_path, views_to_send, prompt, api_key, fov=90, output_size=(1080, 810)):
     """Capture a snapshot, generate views, save files, and optionally call LLM."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    capture_dir = output_dir / timestamp
-    capture_dir.mkdir(parents=True, exist_ok=True)
 
     # Get snapshot
     pil_image = cam.get_snap()
@@ -197,7 +228,7 @@ def capture_and_process(cam, output_dir, views_to_send, prompt, api_key, fov=90,
     img_np = np.array(pil_image)
 
     # Save original fisheye
-    fisheye_path = capture_dir / f"{timestamp}_fisheye.jpg"
+    fisheye_path = session_dir / f"{timestamp}_fisheye.jpg"
     save_image(img_np, fisheye_path)
     print(f"[{timestamp}] Saved fisheye: {fisheye_path}")
 
@@ -207,7 +238,7 @@ def capture_and_process(cam, output_dir, views_to_send, prompt, api_key, fov=90,
     view_paths = {}
     for view_name, view_img in views.items():
         short_name = view_name[0].upper()  # N, E, S, W, B
-        view_path = capture_dir / f"{timestamp}_{short_name}.jpg"
+        view_path = session_dir / f"{timestamp}_{short_name}.jpg"
         save_image(view_img, view_path)
         view_paths[short_name] = view_path
         print(f"[{timestamp}] Saved {view_name}: {view_path}")
@@ -235,7 +266,7 @@ def capture_and_process(cam, output_dir, views_to_send, prompt, api_key, fov=90,
 
         # Save LLM responses
         if results:
-            response_path = capture_dir / f"{timestamp}_llm_responses.json"
+            response_path = session_dir / f"{timestamp}_llm_responses.json"
             with open(response_path, 'w') as f:
                 json.dump({
                     'timestamp': timestamp,
@@ -244,6 +275,13 @@ def capture_and_process(cam, output_dir, views_to_send, prompt, api_key, fov=90,
                     'responses': results,
                 }, f, indent=2)
             print(f"[{timestamp}] Saved LLM responses: {response_path}")
+
+    # Update session metadata with incremented capture count
+    with open(metadata_path, 'r') as f:
+        metadata = json.load(f)
+    metadata['capture_count'] += 1
+    with open(metadata_path, 'w') as f:
+        json.dump(metadata, f, indent=2)
 
     return timestamp
 
@@ -335,7 +373,11 @@ View codes:
     # Normalize view codes to uppercase
     views_to_send = [v.upper() for v in args.views]
 
+    # Create session
+    session_dir, metadata_path = create_session(output_dir)
+
     print(f"Output directory: {output_dir}")
+    print(f"Session directory: {session_dir}")
     print(f"Capture frequency: {args.frequency} seconds")
     print(f"Views to analyze: {views_to_send if views_to_send else 'None (only capturing, no anlysis)'}")
     print()
@@ -344,7 +386,8 @@ View codes:
         while True:
             capture_and_process(
                 cam=cam,
-                output_dir=output_dir,
+                session_dir=session_dir,
+                metadata_path=metadata_path,
                 views_to_send=views_to_send,
                 prompt=prompt,
                 api_key=args.api_key,
@@ -354,6 +397,7 @@ View codes:
 
             if args.once:
                 print("Single capture complete.")
+                update_session_metadata(metadata_path, end_time=datetime.now().isoformat())
                 break
 
             print(f"Waiting {args.frequency} seconds until next capture...")
@@ -362,6 +406,7 @@ View codes:
 
     except KeyboardInterrupt:
         print("\nStopped by user.")
+        update_session_metadata(metadata_path, end_time=datetime.now().isoformat())
 
     return 0
 
