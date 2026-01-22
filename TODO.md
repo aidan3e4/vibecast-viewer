@@ -1,7 +1,6 @@
 Tonight:
-- make the python script for image analysis run in docker
 - check reolink upload
-    - by http at link
+    - by http at link -- http://192.168.1.33/cgi-bin/api.cgi?cmd=Snap&channel=0&rs=s&user=dan&password=dan11111
     - to S3 by FTP
 - find if raspberry pi is needed to upload
 

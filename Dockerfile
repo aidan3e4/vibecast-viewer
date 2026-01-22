@@ -42,7 +42,7 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 COPY reolinkapi/ ./reolinkapi/
 COPY vision_llm/ ./vision_llm/
 COPY clients/ ./clients/
-COPY pyproject.toml ./
+COPY pyproject.toml constants.py ./
 
 # Create data directory for output
 RUN mkdir -p ./data
@@ -57,4 +57,6 @@ USER camera
 
 # # Default command (can be overridden)
 # WORKDIR /app/camera-clients
-# CMD ["python", "camera_capture.py", "--help"]
+CMD ["python", "-m", "clients.camera_capture", \
+    "-v", "B"]
+

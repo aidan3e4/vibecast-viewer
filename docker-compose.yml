@@ -9,7 +9,7 @@ services:
     # Environment variables (override with .env file)
     environment:
       - CAMERA_IP=${CAMERA_IP}
-      - CAMERA_USER=${CAMERA_USER:-admin}
+      - CAMERA_USERNAME=${CAMERA_USERNAME}
       - CAMERA_PASSWORD=${CAMERA_PASSWORD}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       # - CAPTURE_INTERVAL=${CAPTURE_INTERVAL:-60}
@@ -22,12 +22,11 @@ services:
       # - ./.env:/app/.env:ro
 
     # # Override default command with actual capture script
-    command: >
-        sleep infinity
-    #   python camera_capture.py
-    #   --interval ${CAPTURE_INTERVAL:-60}
-    #   --place ${PLACE:-office}
-    #   --analyze
+    # command: >
+    #   python -m clients.camera_capture.py
+    #   --interval ${CAPTURE_INTERVAL:-10}
+    #   --place ${PLACE:-test}
+    #   -v B
 
     # Restart policy
     restart: unless-stopped
