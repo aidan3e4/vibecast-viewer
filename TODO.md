@@ -23,7 +23,6 @@ Engineer debt / optimizations:
 
 
 Simplify the way we connect the cam
-- dockerize the FTP server
 - deploy on runpod and test
-- make it easy to setup the camera on a new wifi
-- setup FTP to not be on disk, because we need it to be permanent
+- make it easy to setup the camera on a new wifi -- i.e., permamnent url, etc
+- setup FTP to not be on disk, because we need it to be permanent. S3 ? minio ? etc

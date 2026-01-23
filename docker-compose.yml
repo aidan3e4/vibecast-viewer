@@ -6,18 +6,26 @@ services:
     image: camera-server:latest
     container_name: camera-server
 
+    # Port mappings
+    ports:
+      - "2121:2121"  # FTP server
+      - "8001:8001"  # Analyzer UI
+
     # Environment variables (override with .env file)
     environment:
       - CAMERA_IP=${CAMERA_IP}
       - CAMERA_USERNAME=${CAMERA_USERNAME}
       - CAMERA_PASSWORD=${CAMERA_PASSWORD}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - FTP_USER=${FTP_USER}
+      - FTP_PASSWORD=${FTP_PASSWORD}
+      - FTP_PORT=${FTP_PORT}
       # - CAPTURE_INTERVAL=${CAPTURE_INTERVAL:-60}
       # - PLACE=${PLACE:-office}
 
-    # # Mount data directory for persistent storage
-    # volumes:
-    #   - ./data:/app/data
+    # Mount data directory for persistent storage
+    volumes:
+      - ./data:/app/data
       # Optional: Mount .env file if you prefer file-based config
       # - ./.env:/app/.env:ro
 

@@ -38,6 +38,12 @@ viewer:
 capture:
 	python3 -m app.capture $(ARGS)
 
+analyzer:
+	@echo "Starting Analyzer UI..."
+	@echo "Configure in .env file"
+	@echo ""
+	@python3 -m app.analyzer
+
 ftp:
 	@echo "Starting FTP server..."
 	@echo "Configure in .env file"
