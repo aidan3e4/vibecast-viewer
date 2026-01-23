@@ -1,180 +1,172 @@
-<h1 align="center"> Reolink Python Api Client </h1>
+# Vibecast - Fisheye Camera Capture & Analysis
 
-<p align="center">
- <img alt="Reolink Approval" src="https://img.shields.io/badge/reolink-approved-blue?style=flat-square">
- <img alt="GitHub" src="https://img.shields.io/github/license/ReolinkCameraAPI/reolinkapipy?style=flat-square">
- <img alt="GitHub tag (latest SemVer)" src="https://img.shields.io/github/v/tag/ReolinkCameraAPI/reolinkapipy?style=flat-square">
- <img alt="PyPI" src="https://img.shields.io/pypi/v/reolinkapi?style=flat-square">
- <img alt="Discord" src="https://img.shields.io/discord/773257004911034389?style=flat-square">
-</p>
+A tool for capturing photos from Reolink fisheye cameras, generating perspective views, and analyzing them with LLM vision models.
 
----
+## Quick Start
 
-A Reolink Camera client written in Python. This repository's purpose **(with Reolink's full support)** is to deliver a complete API for the Reolink Cameras,
-although they have a basic API document - it does not satisfy the need for extensive camera communication.
+### Setup
 
-Check out our documentation for more information on how to use the software at [https://reolink.oleaintueri.com](https://reolink.oleaintueri.com)
-
-
-Other Supported Languages:
- - Go: [reolinkapigo](https://github.com/ReolinkCameraAPI/reolinkapigo)
-
-### Join us on Discord
-
-    https://discord.gg/8z3fdAmZJP
-    
-
-### Sponsorship
-
-<a href="https://oleaintueri.com"><img src="https://oleaintueri.com/images/oliv.svg" width="60px"/><img width="200px" style="padding-bottom: 10px" src="https://oleaintueri.com/images/oleaintueri.svg"/></a>
-
-[Oleaintueri](https://oleaintueri.com) is sponsoring the development and maintenance of these projects within their organisation.
-
-
----
-
-### Get started
-
-Implement a "Camera" object by passing it an IP address, Username and Password. By instantiating the object, it will try retrieve a login token from the Reolink Camera. This token is necessary to interact with the Camera using other commands.
-
-See the `examples` directory.
-
-### Snapshot Uploader Service (NEW!)
-
-A lightweight service designed to run on resource-constrained devices (Raspberry Pi, Orange Pi) for capturing camera snapshots and uploading them to remote storage. This decouples image capture from ML processing, allowing you to run a minimal service on edge hardware and process images on a more powerful server.
-
-**Features:**
-- Minimal dependencies for low-resource devices
-- Multiple storage backends: S3, Filesystem, HTTP
-- Configurable capture intervals
-- Built-in health monitoring
-- Systemd service integration
-
-See the [snapshot-uploader](snapshot-uploader/) directory for complete documentation.
-
-**Quick Start:**
+1. Configure your camera and API credentials in `.env`:
 ```bash
-cd snapshot-uploader
-bash install-rpi.sh
-# Edit .env with your camera settings
-python3 uploader.py
+CAMERA_IP = "192.168.1.143"
+CAMERA_USERNAME = "admin"
+CAMERA_PASSWORD = "your_password"
+USE_HTTPS = "False"
+OPENAI_API_KEY = "sk-..."
 ```
 
-### Using the library as a Python Module
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
 
-Install the package via PyPi
+### Available Commands
 
-    pip install reolinkapi
+Run `make help` to see all available commands:
 
-Install from GitHub
+```bash
+make help       # Show all available commands
+make viewer     # Start the web viewer UI
+make capture    # Run camera capture service
+make ip         # Show your local IP for network access
+```
 
-    pip install git+https://github.com/ReolinkCameraAPI/reolinkapipy.git
+## Usage
 
-If you want to include the video streaming functionality you need to include the streaming "extra" dependencies
+### 1. Web Viewer (Recommended)
 
-    pip install 'reolinkapi[streaming]'
-    
-## Contributors
+Start the web interface to control the camera and view captures:
 
----
+```bash
+make viewer
+```
 
-### Styling and Standards
+Then open in your browser:
+- **Local access**: http://localhost:8000
+- **Network access**: See [Network Access](#network-access) below
 
-This project intends to stick with [PEP8](https://www.python.org/dev/peps/pep-0008/)
+The web viewer provides:
+- Camera connection controls
+- Live view toggle
+- Photo capture with fisheye view
+- Perspective view generation (North, South, East, West, Below)
+- LLM analysis with custom prompts
 
-### How can I become a contributor?
+### 2. Command-Line Capture
 
-#### Step 1
+Run camera capture from the command line:
 
-Get the Restful API calls by looking through the HTTP Requests made in the camera's web UI. I use Google Chrome developer mode (ctr + shift + i) -> Network.
+```bash
+# Single capture
+make capture ARGS='--once'
 
-#### Step 2
+# Continuous capture every 30 seconds with LLM analysis
+make capture ARGS='-f 30 -v N S E W B'
 
-- Fork the repository
-- pip install -r requirements.txt
-- Make your changes
+# Capture with custom views
+make capture ARGS='-f 60 -v N E'
+```
 
-#### Step 3
+**View codes:**
+- `N` = North
+- `S` = South
+- `E` = East
+- `W` = West
+- `B` = Below (floor)
 
-Make a pull request.
+## Network Access
 
-### API Requests Implementation Plan:
+Share the viewer with other devices on your WiFi network:
 
-Stream:
-- [X] Blocking RTSP stream
-- [X] Non-Blocking RTSP stream
+1. **Find your local IP address**:
+```bash
+make ip
+```
 
-GET:
-- [X] Login
-- [X] Logout
-- [X] Display -> OSD
-- [X] Recording -> Encode (Clear and Fluent Stream)
-- [X] Recording -> Advance (Scheduling)
-- [X] Network -> General
-- [X] Network -> Advanced
-- [X] Network -> DDNS
-- [X] Network -> NTP
-- [X] Network -> E-mail
-- [X] Network -> FTP
-- [X] Network -> Push
-- [X] Network -> WIFI
-- [X] Alarm -> Motion
-- [X] System -> General
-- [X] System -> DST
-- [X] System -> Information
-- [ ] System -> Maintenance
-- [X] System -> Performance
-- [ ] System -> Reboot
-- [X] User -> Online User
-- [X] User -> Add User
-- [X] User -> Manage User
-- [X] Device -> HDD/SD Card
-- [x] PTZ -> Presets, Calibration Status
-- [x] Zoom
-- [x] Focus
-- [ ] Image (Brightness, Contrast, Saturation, Hue, Sharp, Mirror, Rotate)
-- [ ] Advanced Image (Anti-flicker, Exposure, White Balance, DayNight, Backlight, LED light, 3D-NR)
-- [X] Image Data -> "Snap" Frame from Video Stream
+2. **Start the viewer**:
+```bash
+make viewer
+```
 
-SET:
-- [X] Display -> OSD
-- [X] Recording -> Encode (Clear and Fluent Stream)
-- [ ] Recording -> Advance (Scheduling)
-- [X] Network -> General
-- [X] Network -> Advanced
-- [ ] Network -> DDNS
-- [ ] Network -> NTP
-- [ ] Network -> E-mail
-- [ ] Network -> FTP
-- [ ] Network -> Push
-- [X] Network -> WIFI
-- [ ] Alarm -> Motion
-- [ ] System -> General
-- [ ] System -> DST
-- [X] System -> Reboot
-- [X] User -> Online User
-- [X] User -> Add User
-- [X] User -> Manage User
-- [X] Device -> HDD/SD Card (Format)
-- [x] PTZ (including calibrate)
-- [x] Zoom
-- [x] Focus
-- [X] Image (Brightness, Contrast, Saturation, Hue, Sharp, Mirror, Rotate)
-- [X] Advanced Image (Anti-flicker, Exposure, White Balance, DayNight, Backlight, LED light, 3D-NR)
+3. **Share the URL** with others on your network:
+```
+http://YOUR_IP:8000
+```
+(Replace `YOUR_IP` with the address shown by `make ip`, typically `192.168.1.xxx`)
 
-### Supported Cameras
+Others on your WiFi can now access the viewer from their browsers.
 
-Any Reolink camera that has a web UI should work. The other's requiring special Reolink clients
-do not work and is not supported here.
+### Firewall Configuration
 
-- RLC-411WS
-- RLC-423
-- RLC-420-5MP
-- RLC-410-5MP
-- RLC-510A
-- RLC-520
-- RLC-823A
-- C1-Pro
-- D400
-- E1 Zoom
+If you can't connect from other devices, you may need to allow port 8000:
 
+**Linux:**
+```bash
+sudo ufw allow 8000/tcp              # Ubuntu/Debian
+sudo firewall-cmd --add-port=8000/tcp  # Fedora/RHEL
+```
+
+**macOS:**
+```bash
+# Port 8000 is typically open by default
+```
+
+## Features
+
+### Camera Control UI
+- Connect to Reolink fisheye cameras
+- Live view with auto-refresh
+- Capture fisheye photos
+- Generate perspective views (unwarp)
+- Analyze views with OpenAI Vision
+
+### Session Viewer
+- Browse all capture sessions
+- View captured images and perspective views
+- Review LLM analysis results
+- Session metadata tracking
+
+### Command-Line Capture
+- Automated periodic captures
+- Customizable capture frequency
+- Select which views to analyze
+- Session-based organization
+- Configurable FOV and output size
+
+## Project Structure
+
+```
+vibecast/
+├── clients/           # Camera capture client
+├── viewer/            # Web viewer application
+│   └── templates/     # HTML templates
+├── vision_llm/        # LLM analysis and fisheye processing
+├── data/              # Captured sessions (auto-created)
+├── .env               # Configuration
+└── Makefile           # Shortcuts
+```
+
+## Output
+
+Captured images are saved in session directories under `data/`:
+
+```
+data/
+└── session_20240123_143022/
+    ├── session_metadata.json
+    ├── 20240123_143022_fisheye.jpg
+    ├── 20240123_143022_N.jpg  (North view)
+    ├── 20240123_143022_S.jpg  (South view)
+    ├── 20240123_143022_E.jpg  (East view)
+    ├── 20240123_143022_W.jpg  (West view)
+    ├── 20240123_143022_B.jpg  (Below view)
+    └── 20240123_143022_llm_responses.json
+```
+
+## Tips
+
+- Use the web viewer for interactive control and testing
+- Use command-line capture for automated monitoring
+- Sessions are automatically organized by timestamp
+- LLM analysis is optional - capture works without it
+- All .env values are pre-populated in the web UI

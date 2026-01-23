@@ -1,7 +1,6 @@
 Product: 
 - write better analysis prompt: figure out what to extract
 - add some sort of memory: either pass in previous state, or what
-- fix viewer to make it useable by Dan -- views mightbe wrong and LLM call fails
 
 GTM:
 - improve the Viz
