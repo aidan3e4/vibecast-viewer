@@ -14,12 +14,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 
-from constants import viewers_dir, data_dir as DATA_DIR
+from constants import viewer_dir, data_dir as DATA_DIR
 
 app = FastAPI(title="Camera Session Viewer")
 
 # Configuration
-templates = Jinja2Templates(directory=viewers_dir / "templates")
+templates = Jinja2Templates(directory=viewer_dir / "templates")
 
 
 def get_available_sessions():
