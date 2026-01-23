@@ -40,7 +40,6 @@ capture:
 
 ftp:
 	@echo "Starting FTP server..."
-	@echo "Upload directory: ftp_uploads/"
 	@echo "Configure in .env file"
 	@echo ""
 	@python3 ftp_server/server.py

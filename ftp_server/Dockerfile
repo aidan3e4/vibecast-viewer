@@ -10,8 +10,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY server.py .
 COPY ../.env.example .env
 
-# Create upload directory
-RUN mkdir -p ftp_uploads
+# Create upload directory -- check constants.py for the dir
+RUN mkdir -p data/ftp_uploads
 
 # Expose FTP port
 EXPOSE 2121

@@ -150,22 +150,6 @@ Directory: /
 
 Test the connection in camera settings.
 
-## Step 10: Monitor Uploads
-
-```bash
-# Watch log in real-time
-tail -f ftp_server.log
-
-# Check upload directory
-ls -lh ftp_uploads/
-
-# Count files
-ls ftp_uploads/ | wc -l
-
-# Watch directory continuously
-watch -n 2 'ls -lh ftp_uploads/ | tail -10'
-```
-
 ## Using Docker (Alternative)
 
 If you prefer Docker:
@@ -177,7 +161,7 @@ docker build -f ftp_server/Dockerfile -t vibecast-ftp .
 # Run container
 docker run -d \
   -p 2121:2121 \
-  -v $(pwd)/ftp_uploads:/app/ftp_uploads \
+  -v $(pwd)/data/ftp_uploads:/app/data/ftp_uploads \
   --env-file .env \
   --name ftp-server \
   vibecast-ftp
@@ -235,7 +219,7 @@ Runpod CPU pricing (approximate, check current rates):
 
 ### Files not appearing
 - Check disk space: `df -h`
-- Check permissions: `ls -la ftp_uploads/`
+- Check permissions: `ls -la data/ftp_uploads/`
 - Review camera upload settings
 - Check logs for errors
 
@@ -260,10 +244,6 @@ For long-term deployments, use runpod volumes:
 
 1. Create a network volume in runpod
 2. Mount it when creating pod: `/workspace`
-3. Update `.env`:
-   ```bash
-   FTP_UPLOAD_DIR=/workspace/ftp_uploads
-   ```
 
 This ensures uploads persist even if pod restarts.
 

@@ -15,7 +15,6 @@ FTP_USER = "reolink"
 FTP_PASSWORD = "camera123"
 FTP_PORT = "2121"
 FTP_HOST = "0.0.0.0"
-FTP_UPLOAD_DIR = "./ftp_uploads"
 ```
 
 3. **Start the FTP server**:
@@ -58,7 +57,6 @@ FTP_USER = "reolink"
 FTP_PASSWORD = "STRONG_PASSWORD_HERE"  # Change this!
 FTP_PORT = "2121"
 FTP_HOST = "0.0.0.0"  # Accept connections from anywhere
-FTP_UPLOAD_DIR = "./ftp_uploads"
 FTP_MAX_CONS = "256"
 FTP_MAX_CONS_PER_IP = "5"
 ```
@@ -131,7 +129,7 @@ Configure what triggers uploads:
 
 ## File Organization
 
-Uploaded files will be organized in `ftp_uploads/`:
+Uploaded files will be organized in `data/ftp_uploads/`:
 
 ```
 ftp_uploads/
@@ -220,8 +218,8 @@ sudo ufw allow 60000:60100/tcp
 
 1. **Check upload directory permissions**:
    ```bash
-   ls -la ftp_uploads/
-   chmod 755 ftp_uploads/
+   ls -la data/ftp_uploads/
+   chmod 755 data/ftp_uploads/
    ```
 
 2. **Check disk space**:

@@ -15,6 +15,9 @@ from pyftpdlib.servers import FTPServer
 from dotenv import load_dotenv
 import logging
 
+from constants import ftp_uploads_dir as FTP_UPLOAD_DIR
+
+
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
@@ -29,7 +32,6 @@ FTP_USER = os.environ.get("FTP_USER", "reolink")
 FTP_PASSWORD = os.environ.get("FTP_PASSWORD", "camera123")
 FTP_PORT = int(os.environ.get("FTP_PORT", "2121"))
 FTP_HOST = os.environ.get("FTP_HOST", "0.0.0.0")  # 0.0.0.0 to accept connections from anywhere
-FTP_UPLOAD_DIR = Path(os.environ.get("FTP_UPLOAD_DIR", "./ftp_uploads"))
 FTP_MAX_CONS = int(os.environ.get("FTP_MAX_CONS", "256"))
 FTP_MAX_CONS_PER_IP = int(os.environ.get("FTP_MAX_CONS_PER_IP", "5"))
 

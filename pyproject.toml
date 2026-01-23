@@ -15,6 +15,7 @@ dependencies = [
     "openai>=2.15.0",
     "opencv-python-headless>=4.13.0.90",
     "pillow>=12.1.0",
+    "pyftpdlib>=2.1.0",
     "pysocks>=1.7.1",
     "pyyaml>=6.0.2",
     "requests>=2.32.3",

@@ -2,12 +2,13 @@ Product:
 - write better analysis prompt: figure out what to extract
 - add some sort of memory: either pass in previous state, or what
 
-Viewer:
-- add save button for t he prompt
+Viewer / UI:
+- add save button for the prompt
 - deploy it on a server
 - make it run with images uploaded to FTP server
-- fix sessions, seems like everytime we take a snapshot in the viewer we get a new session
+- fix sessions, seems like everytime we take a snapshot in the viewer we get a new session -- also sessions created through the UI should be downloaded locally here in my data folder
 - add button to remove sessison to poubelle
+- there is a bug in make viewer -- check logs
 
 GTM:
 - improve the Viz
@@ -23,12 +24,12 @@ Deployment:
 Engineer debt / optimizations:
 - make LLM client async --> use vllm
 - split vision_llm into a CV part and an LLM part
-
+- upload the data with FTPS instead of FTP (more secure)
 
 
 Simplify the way we connect the cam
-- set up FTP server locally
-- have the camera upload to it
+- have the backend run on the uploaded photos
 - dockerize the FTP server
 - deploy on runpod and test
-- make it easy to setup the camera on a new wifi`q za
+- make it easy to setup the camera on a new wifi
+- setup FTP to not be on disk, because we need it to be permanent

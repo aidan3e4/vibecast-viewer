@@ -72,10 +72,14 @@ def test_ftp_connection():
         else:
             print("✗ Upload verification failed")
 
-        # Get file size
-        size = ftp.size(f'test_{test_filename}')
-        if size:
-            print(f"✓ File size: {size} bytes")
+        # Get file size (try binary mode first)
+        try:
+            ftp.voidcmd('TYPE I')  # Switch to binary mode
+            size = ftp.size(f'test_{test_filename}')
+            if size:
+                print(f"✓ File size: {size} bytes")
+        except Exception as e:
+            print(f"  (Could not get file size: {e})")
 
         # Cleanup local test file
         os.unlink(test_file.name)
