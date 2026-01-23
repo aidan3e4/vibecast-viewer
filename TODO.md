@@ -2,12 +2,18 @@ Product:
 - write better analysis prompt: figure out what to extract
 - add some sort of memory: either pass in previous state, or what
 
+Viewer:
+- add save button for t he prompt
+- deploy it on a server
+- make it run with images uploaded to FTP server
+- fix sessions, seems like everytime we take a snapshot in the viewer we get a new session
+- add button to remove sessison to poubelle
+
 GTM:
 - improve the Viz
 
 Deployment:
 - check reolink upload
-    - by http at link -- http://192.168.1.33/cgi-bin/api.cgi?cmd=Snap&channel=0&rs=s&user=dan&password=dan11111 -- still have to be local on the same network
     - to S3 by FTP
     - find if raspberry pi is needed to upload
 - figure out how to decouple upload from processing. Can the orange pi do all the processing ? The LLM call is fine, the unwarping and all is probably not

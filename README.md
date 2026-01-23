@@ -28,6 +28,7 @@ Run `make help` to see all available commands:
 make help       # Show all available commands
 make viewer     # Start the web viewer UI
 make capture    # Run camera capture service
+make ftp        # Start FTP server for camera uploads
 make ip         # Show your local IP for network access
 ```
 
@@ -73,6 +74,24 @@ make capture ARGS='-f 60 -v N E'
 - `E` = East
 - `W` = West
 - `B` = Below (floor)
+
+### 3. FTP Server for Camera Uploads
+
+Run an FTP server to receive automatic uploads from your Reolink camera:
+
+```bash
+# Install FTP server dependencies
+pip install -r requirements-ftp.txt
+
+# Start FTP server
+make ftp
+```
+
+The FTP server can be deployed on cloud servers (e.g., runpod) to receive uploads over the internet. See [FTP Server Documentation](docs/FTP_SERVER.md) for:
+- Cloud deployment on runpod
+- Reolink camera configuration
+- Security best practices
+- Troubleshooting
 
 ## Network Access
 
