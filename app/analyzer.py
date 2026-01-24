@@ -230,6 +230,66 @@ async def index(request: Request):
     })
 
 
+@app.get('/api/images/stats')
+async def get_image_stats():
+    """Get statistics about available images for histogram display."""
+    try:
+        from collections import defaultdict
+
+        date_counts = defaultdict(int)
+        first_date = None
+        last_date = None
+
+        # Walk through the FTP uploads directory
+        for year_dir in ftp_uploads_dir.iterdir():
+            if not year_dir.is_dir():
+                continue
+
+            for month_dir in year_dir.iterdir():
+                if not month_dir.is_dir():
+                    continue
+
+                for day_dir in month_dir.iterdir():
+                    if not day_dir.is_dir():
+                        continue
+
+                    # Count jpg files in this day
+                    jpg_files = list(day_dir.glob('Reolink_00_*.jpg'))
+                    if jpg_files:
+                        # Parse date from directory structure
+                        # Assuming structure: year/month/day
+                        year = year_dir.name
+                        month = month_dir.name
+                        day = day_dir.name
+                        date_str = f"{year}-{month}-{day}"
+
+                        try:
+                            date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+                            date_key = date_obj.strftime('%Y-%m-%d')
+                            date_counts[date_key] = len(jpg_files)
+
+                            if first_date is None or date_obj < first_date:
+                                first_date = date_obj
+                            if last_date is None or date_obj > last_date:
+                                last_date = date_obj
+                        except ValueError:
+                            continue
+
+        # Convert to sorted list
+        sorted_dates = sorted(date_counts.items())
+
+        return {
+            'dates': [d[0] for d in sorted_dates],
+            'counts': [d[1] for d in sorted_dates],
+            'first_date': first_date.strftime('%Y-%m-%d') if first_date else None,
+            'last_date': last_date.strftime('%Y-%m-%d') if last_date else None,
+            'total_images': sum(date_counts.values()),
+            'total_days': len(date_counts)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post('/api/images/list')
 async def list_images(req: TimeRangeRequest):
     """List all images in the given time range."""

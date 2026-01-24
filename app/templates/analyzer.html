@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FTP Upload Analyzer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -496,6 +498,32 @@
         <!-- Step 1: Time Range Selection -->
         <div class="panel">
             <h2>Step 1: Select Time Range</h2>
+
+            <!-- Photo Distribution Histogram -->
+            <div id="histogramContainer" style="margin-bottom: 30px; display: none;">
+                <h3 style="font-size: 1.1em; color: #555; margin-bottom: 10px;">Photo Distribution Over Time</h3>
+                <p style="font-size: 0.9em; color: #888; margin-bottom: 15px; font-style: italic;">
+                    Click on any bar to select that date
+                </p>
+                <div style="background: #fafafa; padding: 20px; border-radius: 8px; border: 2px solid #e0e0e0;">
+                    <canvas id="photoHistogram" style="max-height: 250px; cursor: pointer;"></canvas>
+                </div>
+                <div id="histogramStats" style="margin-top: 15px; display: flex; gap: 20px; justify-content: center;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 1.2em; font-weight: bold; color: #4CAF50;" id="totalPhotos">0</div>
+                        <div style="font-size: 0.9em; color: #666;">Total Photos</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 1.2em; font-weight: bold; color: #4CAF50;" id="totalDays">0</div>
+                        <div style="font-size: 0.9em; color: #666;">Days with Photos</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 1.2em; font-weight: bold; color: #4CAF50;" id="dateRange">-</div>
+                        <div style="font-size: 0.9em; color: #666;">Date Range</div>
+                    </div>
+                </div>
+            </div>
+
             <div class="form-inline">
                 <div class="form-group">
                     <label for="startDate">Start Date</label>
@@ -591,6 +619,7 @@
         let unwarpedData = {};
         let selectedUnwarpedImages = []; // Array of {timestamp, direction, path}
         let currentStep = 1;
+        let photoHistogramChart = null;
 
         const DIRECTION_NAMES = {
             'N': 'North',
@@ -599,6 +628,117 @@
             'W': 'West',
             'B': 'Below'
         };
+
+        // Load photo statistics and display histogram on page load
+        async function loadPhotoStats() {
+            try {
+                const response = await fetch('/api/images/stats');
+                const data = await response.json();
+
+                if (response.ok && data.dates && data.dates.length > 0) {
+                    displayHistogram(data);
+                    document.getElementById('histogramContainer').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Failed to load photo statistics:', error);
+            }
+        }
+
+        function displayHistogram(stats) {
+            // Update statistics
+            document.getElementById('totalPhotos').textContent = stats.total_images;
+            document.getElementById('totalDays').textContent = stats.total_days;
+
+            if (stats.first_date && stats.last_date) {
+                document.getElementById('dateRange').textContent =
+                    `${stats.first_date} to ${stats.last_date}`;
+            }
+
+            // Create histogram chart
+            const ctx = document.getElementById('photoHistogram').getContext('2d');
+
+            if (photoHistogramChart) {
+                photoHistogramChart.destroy();
+            }
+
+            photoHistogramChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: stats.dates,
+                    datasets: [{
+                        label: 'Photos per Day',
+                        data: stats.counts,
+                        backgroundColor: 'rgba(76, 175, 80, 0.6)',
+                        borderColor: 'rgba(76, 175, 80, 1)',
+                        borderWidth: 1,
+                        hoverBackgroundColor: 'rgba(76, 175, 80, 0.8)',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            const index = elements[0].index;
+                            const selectedDate = stats.dates[index];
+                            // Set the date inputs to the clicked date
+                            document.getElementById('startDate').value = selectedDate;
+                            document.getElementById('endDate').value = selectedDate;
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: (items) => {
+                                    return items[0].label;
+                                },
+                                label: (item) => {
+                                    return `${item.parsed.y} photo${item.parsed.y !== 1 ? 's' : ''}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'day',
+                                displayFormats: {
+                                    day: 'MMM d'
+                                },
+                                tooltipFormat: 'MMM d, yyyy'
+                            },
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
+        }
+
+        // Load stats when page loads
+        window.addEventListener('DOMContentLoaded', loadPhotoStats);
 
         function updateStep(step) {
             currentStep = step;
