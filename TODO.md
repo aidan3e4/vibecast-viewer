@@ -15,4 +15,3 @@ Deployment:
 Engineer debt / optimizations:
 - make LLM client async --> use vllm
 - split vision_llm into a CV part and an LLM part
-
