@@ -1,7 +1,0 @@
-[
-  {
-    "cmd": "Login",
-    "code": 0,
-    "value": { "Token": { "leaseTime": 3600, "name": "xxxxxxxxxxxx" } }
-  }
-]

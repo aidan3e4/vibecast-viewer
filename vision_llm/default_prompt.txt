@@ -1,8 +1,0 @@
-Analyze this image. Describe what you see. Respond in the following JSON format
-
-```JSON
-{
-    "mood": str,
-    "number_of_people": int,
-}
-```
