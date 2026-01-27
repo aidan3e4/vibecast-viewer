@@ -9,15 +9,9 @@ Viewer / UI:
 - there is a bug in make viewer -- check logs
 
 Deployment:
-- figure out how to decouple upload from processing. Can the orange pi do all the processing ? The LLM call is fine, the unwarping and all is probably not
 - deploy a serverless function to process on runpod
 - best practice to inject some vars into the script, for now they're copied from local repo
 
 Engineer debt / optimizations:
 - make LLM client async --> use vllm
 - split vision_llm into a CV part and an LLM part
-
-
-Simplify the way we connect the cam
-- deploy on runpod and test
-- make it easy to setup the camera on a new wifi -- i.e., permamnent url, etc
