@@ -449,3 +449,87 @@ def list_all_results() -> list[dict]:
     # Sort by last modified (newest first)
     results.sort(key=lambda x: x["last_modified"] or "", reverse=True)
     return results
+
+
+def get_result_stats() -> dict[str, Any]:
+    """Get statistics about results for histogram display.
+
+    Returns two histograms:
+    - results_generated: Count of results by the date they were processed
+    - images_analyzed: Count of images analyzed by the date they were taken
+    """
+    try:
+        s3 = get_s3_client()
+        results_generated_counts: dict[str, int] = defaultdict(int)
+        images_analyzed_counts: dict[str, int] = defaultdict(int)
+
+        paginator = s3.get_paginator("list_objects_v2")
+
+        for page in paginator.paginate(Bucket=BUCKET_NAME, Prefix=f"{PREFIX_RESULTS}/"):
+            for obj in page.get("Contents", []):
+                key = obj["Key"]
+                filename = key.split("/")[-1]
+
+                if not filename.endswith(".json"):
+                    continue
+
+                # Fetch and parse the result JSON
+                try:
+                    response = s3.get_object(Bucket=BUCKET_NAME, Key=key)
+                    content = response["Body"].read().decode("utf-8")
+                    data = json.loads(content)
+
+                    # Count for results generated histogram (by processed_at date)
+                    if "processed_at" in data:
+                        # processed_at format: "2026-01-28T12:09:45.462828Z"
+                        processed_date = data["processed_at"].split("T")[0]
+                        results_generated_counts[processed_date] += 1
+
+                    # Count for images analyzed histogram (by image capture date)
+                    if "input_uri" in data:
+                        # Extract filename from input_uri
+                        # e.g., s3://vibecast-ftp/ftp_uploads/2026/01/26/reolink_00_20260126233811.jpg
+                        input_filename = data["input_uri"].split("/")[-1]
+                        parsed = parse_image_filename(input_filename)
+                        if parsed:
+                            image_date = parsed["date"]
+                            images_analyzed_counts[image_date] += 1
+
+                except (ClientError, json.JSONDecodeError, KeyError):
+                    # Skip malformed or inaccessible results
+                    continue
+
+        # Sort dates
+        sorted_results = sorted(results_generated_counts.items())
+        sorted_images = sorted(images_analyzed_counts.items())
+
+        return {
+            "results_generated": {
+                "dates": [d[0] for d in sorted_results],
+                "counts": [d[1] for d in sorted_results],
+            },
+            "images_analyzed": {
+                "dates": [d[0] for d in sorted_images],
+                "counts": [d[1] for d in sorted_images],
+            },
+            "total_results": sum(results_generated_counts.values()),
+            "total_images_analyzed": sum(images_analyzed_counts.values()),
+        }
+    except (NoCredentialsError, PartialCredentialsError):
+        return {
+            "results_generated": {"dates": [], "counts": []},
+            "images_analyzed": {"dates": [], "counts": []},
+            "total_results": 0,
+            "total_images_analyzed": 0,
+            "error": "credentials",
+            "error_message": "AWS credentials not configured."
+        }
+    except Exception as e:
+        return {
+            "results_generated": {"dates": [], "counts": []},
+            "images_analyzed": {"dates": [], "counts": []},
+            "total_results": 0,
+            "total_images_analyzed": 0,
+            "error": "unknown",
+            "error_message": str(e)
+        }

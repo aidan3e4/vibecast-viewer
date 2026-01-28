@@ -213,6 +213,12 @@ async def unwarp_image(image_key: str) -> dict[str, Any]:
 # ============================================================================
 
 
+@app.get("/api/result-stats")
+async def get_result_stats() -> dict[str, Any]:
+    """Get result statistics for histograms."""
+    return s3_service.get_result_stats()
+
+
 @app.get("/api/results")
 async def list_results(date: str | None = None) -> dict[str, Any]:
     """List result files, optionally filtered by date."""
