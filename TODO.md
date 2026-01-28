@@ -5,8 +5,6 @@ SECOND:
 - make it work locally, then dockerize
 - then deploy somewhere at a fixed address
 
-
-
 Viewer / UI:
 - add save button for the prompt
 - fix sessions, seems like everytime we take a snapshot in the viewer we get a new session -- also sessions created through the UI should be downloaded locally here in my data folder

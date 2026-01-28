@@ -42,17 +42,12 @@ COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
-COPY reolinkapi/ ./reolinkapi/
-COPY vision_llm/ ./vision_llm/
-COPY app/ ./app/
 COPY pyproject.toml constants.py Makefile ./
 
 # Copy entrypoint script
 COPY entrypoint.sh ./
 RUN chmod +x ./entrypoint.sh
 
-# Create data directory for output
-RUN mkdir -p ./data
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
@@ -63,7 +58,7 @@ RUN useradd -m -u 1000 camera && chown -R camera:camera /app
 USER camera
 
 # Expose ports
-EXPOSE 2121 8001
+EXPOSE 8001
 
 # Run the entrypoint script
 CMD ["./entrypoint.sh"]
