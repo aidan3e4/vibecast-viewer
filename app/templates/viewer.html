@@ -152,6 +152,15 @@
             background: #d63651;
         }
 
+        .btn-success {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background: #45a049;
+        }
+
         .btn-secondary {
             background: #0f3460;
             color: #ddd;
@@ -180,6 +189,10 @@
             border-radius: 8px;
             text-align: center;
             flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
 
         .stat-value {
@@ -209,6 +222,7 @@
             cursor: pointer;
             transition: all 0.2s;
             border: 2px solid transparent;
+            position: relative;
         }
 
         .image-card:hover {
@@ -216,8 +230,26 @@
             transform: translateY(-2px);
         }
 
-        .image-card.selected {
+        .image-card.has-selection {
             border-color: #4CAF50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+        }
+
+        .image-card .selection-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #4CAF50;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            z-index: 10;
         }
 
         .image-card img {
@@ -363,6 +395,9 @@
             background: #0f3460;
             border-radius: 8px;
             overflow: hidden;
+            position: relative;
+            border: 2px solid transparent;
+            transition: border-color 0.2s;
         }
 
         .unwarped-item.not-available {
@@ -374,11 +409,19 @@
             border: 2px solid #e94560;
         }
 
+        .unwarped-item.selected {
+            border: 2px solid #4CAF50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+        }
+
         .unwarped-item .direction {
             padding: 10px 15px;
             background: #1a4a8a;
             font-weight: 500;
             text-transform: capitalize;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .unwarped-item.fisheye .direction {
@@ -386,15 +429,58 @@
             color: white;
         }
 
+        .unwarped-item.selected .direction {
+            background: #4CAF50;
+            color: white;
+        }
+
         .unwarped-item img {
             width: 100%;
+            height: auto;
             display: block;
+            object-fit: cover;
+            aspect-ratio: 4/3;
         }
 
         .unwarped-item .not-found {
             padding: 40px;
             text-align: center;
             color: #666;
+        }
+
+        .selection-checkbox {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #4CAF50;
+        }
+
+        .selection-toggle-btn {
+            background: #0f3460;
+            border: 1px solid #1a4a8a;
+            color: #ddd;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .selection-toggle-btn:hover {
+            background: #1a4a8a;
+        }
+
+        .selection-toggle-btn.selected {
+            background: #4CAF50;
+            border-color: #4CAF50;
+            color: white;
+        }
+
+        .selection-toggle-btn .checkmark {
+            font-size: 16px;
         }
 
         /* Processing */
@@ -836,9 +922,6 @@
 
         <div class="panel">
             <h2>Image Distribution</h2>
-            <div id="histogramContainer">
-                <canvas id="histogram" height="200"></canvas>
-            </div>
             <div class="stats-row" id="globalStats">
                 <div class="stat-box">
                     <div class="stat-value" id="totalImages">-</div>
@@ -852,6 +935,9 @@
                     <div class="stat-value" id="dateRange">-</div>
                     <div class="stat-label">Date Range</div>
                 </div>
+            </div>
+            <div id="histogramContainer" style="margin-top: 20px;">
+                <canvas id="histogram" height="200"></canvas>
             </div>
         </div>
 
@@ -921,19 +1007,24 @@
                 </div>
             </div>
 
-            <!-- Auto-unwarp checkbox -->
-            <div style="margin: 20px 0; padding: 15px; background: #0f3460; border-radius: 8px; display: flex; align-items: center; gap: 10px;">
-                <input type="checkbox" id="autoUnwarpCheckbox" style="width: auto; cursor: pointer;">
-                <label for="autoUnwarpCheckbox" style="color: #ddd; cursor: pointer; margin: 0;">
-                    Automatically unwarp images
-                </label>
-            </div>
-
             <div id="imageGridContainer">
                 <div class="stats-row" id="dayStats" style="display: none;">
                     <div class="stat-box">
                         <div class="stat-value" id="dayImageCount">0</div>
-                        <div class="stat-label">Images in range</div>
+                        <div class="stat-label">Captured images in range</div>
+                        <div style="margin-top: 12px; display: flex; align-items: center; gap: 8px; justify-content: center;">
+                            <input type="checkbox" id="autoUnwarpCheckbox" style="width: auto; cursor: pointer; margin: 0;">
+                            <label for="autoUnwarpCheckbox" style="color: #aaa; cursor: pointer; margin: 0; font-size: 0.85em;">
+                                Auto-unwarp images
+                            </label>
+                        </div>
+                    </div>
+                    <div class="stat-box" id="selectedImageCount">
+                        <div class="stat-value" style="color: #4CAF50;" id="selectedImageCountValue">0</div>
+                        <div class="stat-label">Unwarped images selected for processing</div>
+                        <button class="btn btn-success" id="processImageBtn" onclick="goToProcessTab()" disabled title="Select an image to process first" style="margin-top: 12px; padding: 8px 16px; font-size: 0.9em;">
+                            Process Images
+                        </button>
                     </div>
                 </div>
                 <div class="image-grid" id="imageGrid"></div>
@@ -944,34 +1035,33 @@
     <!-- Tab 2: Process Images -->
     <div id="process" class="tab-content">
         <div class="panel">
-            <h2>Process Image with Lambda</h2>
-            <div class="process-form">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="processDate">Select Date</label>
-                        <input type="date" id="processDate" value="{{ default_date }}">
+            <h2>Process Selected Images</h2>
+            <p id="processTabHelp" style="color: #888; margin-bottom: 20px;">Select images from the Image Explorer tab, then return here to process them.</p>
+
+            <div id="selectedImagesContainer">
+                <div class="stats-row" style="margin-bottom: 20px;">
+                    <div class="stat-box">
+                        <div class="stat-value" style="color: #4CAF50;" id="processSelectedCount">0</div>
+                        <div class="stat-label">Images Selected</div>
                     </div>
-                    <button class="btn btn-secondary" onclick="loadImagesForProcessing()">Load Images</button>
                 </div>
 
+                <div id="selectedImagesGrid" class="unwarped-grid" style="margin-bottom: 30px;">
+                    <div class="empty-state">
+                        <p style="color: #666;">No images selected yet.</p>
+                        <p style="color: #888; font-size: 0.9em; margin-top: 10px;">Go to the Image Explorer tab and select unwarped images to process.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="process-form" style="max-width: 100%;">
                 <div class="form-group">
-                    <label for="processImageSelect">Select Image</label>
-                    <select id="processImageSelect" onchange="onProcessImageSelect()">
-                        <option value="">-- Load images first --</option>
-                    </select>
-                </div>
-
-                <div class="selected-image-preview" id="processPreview">
-                    <img id="processPreviewImg" src="" alt="Selected image">
-                </div>
-
-                <div class="form-group">
-                    <label for="processPrompt">Prompt (optional)</label>
+                    <label for="processPrompt">Analysis Prompt (optional)</label>
                     <textarea id="processPrompt" rows="4" placeholder="Enter a custom prompt for the analysis..."></textarea>
                 </div>
 
-                <button class="btn btn-primary" id="processBtn" onclick="processImage()" disabled>
-                    Process Image
+                <button class="btn btn-primary" id="processBtn" onclick="processSelectedImages()" disabled>
+                    Process All Selected Images
                 </button>
 
                 <div class="processing-status" id="processStatus"></div>
@@ -1010,6 +1100,9 @@
                     <button class="btn btn-primary" id="unwarpButton" onclick="manualUnwarp()" style="display: none;">
                         Unwarp This Image
                     </button>
+                    <button class="btn btn-success" id="modalProcessButton" onclick="goToProcessTab()" style="display: none;">
+                        Process Images
+                    </button>
                     <span id="unwarpStatus" style="color: #888; font-size: 0.9em;"></span>
                     <button class="modal-close" onclick="closeModal()">&times;</button>
                 </div>
@@ -1030,6 +1123,7 @@
                     <span class="fullscreen-label" id="fullscreenLabel"></span>
                 </div>
                 <button class="fullscreen-nav-btn" id="fullscreenNextBtn" onclick="navigateFullscreen(1); event.stopPropagation();" title="Next image (Right Arrow)">&#9654;</button>
+                <button class="selection-toggle-btn" id="fullscreenSelectBtn" onclick="toggleCurrentFullscreenSelection(); event.stopPropagation();">Select Image</button>
             </div>
             <img id="fullscreenImg" src="" alt="" onclick="event.stopPropagation()">
             <button class="fullscreen-close" onclick="closeFullscreen(); event.stopPropagation();" title="Close (Esc)">&#10005;</button>
@@ -1045,6 +1139,8 @@
         let currentImageIndex = -1;
         let fullscreenImages = [];
         let currentFullscreenIndex = -1;
+        let fullscreenContext = 'explorer'; // 'explorer' or 'process'
+        let selectedImages = []; // Array of {url, label, imageKey, filename, s3Key}
 
         // Tab switching
         document.querySelectorAll('.tab').forEach(tab => {
@@ -1057,6 +1153,11 @@
                 // Load data when switching to results tab
                 if (tab.dataset.tab === 'results') {
                     loadAllResults();
+                }
+
+                // Update process tab when switching to it
+                if (tab.dataset.tab === 'process') {
+                    renderProcessTab();
                 }
             });
         });
@@ -1312,15 +1413,22 @@
                     return;
                 }
 
-                grid.innerHTML = data.images.map((img, index) => `
-                    <div class="image-card" onclick="showUnwarped('${img.key}', '${img.filename}', ${index})">
-                        <img src="${img.url}" alt="${img.filename}" loading="lazy">
-                        <div class="info">
-                            <div class="filename">${img.filename}</div>
-                            <div class="time">${img.date} ${img.time}</div>
+                grid.innerHTML = data.images.map((img, index) => {
+                    const selectionCount = getSelectionCountForImage(img.key);
+                    const hasSelection = selectionCount > 0;
+                    const badge = hasSelection ? `<div class="selection-badge"><span>&#10003;</span> ${selectionCount}</div>` : '';
+
+                    return `
+                        <div class="image-card ${hasSelection ? 'has-selection' : ''}" data-image-key="${img.key}" onclick="showUnwarped('${img.key}', '${img.filename}', ${index})">
+                            ${badge}
+                            <img src="${img.url}" alt="${img.filename}" loading="lazy">
+                            <div class="info">
+                                <div class="filename">${img.filename}</div>
+                                <div class="time">${img.date} ${img.time}</div>
+                            </div>
                         </div>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
             } catch (error) {
                 grid.innerHTML = `<div class="empty-state">Error: ${error.message}</div>`;
             }
@@ -1377,7 +1485,7 @@
                 // Add fisheye image
                 if (fisheyeUrl) {
                     gridHTML += `
-                        <div class="unwarped-item fisheye">
+                        <div class="unwarped-item fisheye" data-label="Original Fisheye">
                             <div class="direction">Original Fisheye</div>
                             <img src="${fisheyeUrl}" alt="Original Fisheye" onclick="openFullscreen('${fisheyeUrl}', 'Original Fisheye')" style="cursor: zoom-in;">
                         </div>
@@ -1388,9 +1496,14 @@
                 gridHTML += directions.map(dir => {
                     const item = data.unwarped[dir];
                     if (item && item.exists) {
+                        const s3Key = item.s3_key || '';
                         return `
-                            <div class="unwarped-item">
-                                <div class="direction">${item.direction}</div>
+                            <div class="unwarped-item" data-url="${item.url}" data-label="${item.direction}">
+                                <div class="direction">
+                                    <span>${item.direction}</span>
+                                    <input type="checkbox" class="selection-checkbox"
+                                           onclick="event.stopPropagation(); toggleImageSelection('${item.url}', '${item.direction}', '${s3Key}')">
+                                </div>
                                 <img src="${item.url}" alt="${item.direction}" onclick="openFullscreen('${item.url}', '${item.direction}')" style="cursor: zoom-in;">
                             </div>
                         `;
@@ -1405,6 +1518,9 @@
                 }).join('');
 
                 grid.innerHTML = gridHTML;
+
+                // Update selection UI to reflect current selections
+                updateSelectionUI();
 
                 // Check if auto-unwarp is enabled
                 const autoUnwarp = document.getElementById('autoUnwarpCheckbox').checked;
@@ -1498,11 +1614,11 @@
             const items = document.querySelectorAll('#unwarpedGrid .unwarped-item:not(.not-available)');
             items.forEach(item => {
                 const img = item.querySelector('img');
-                const directionEl = item.querySelector('.direction');
-                if (img && directionEl) {
+                const label = item.dataset.label;
+                if (img && label) {
                     fullscreenImages.push({
                         url: img.src,
-                        label: directionEl.textContent.trim()
+                        label: label
                     });
                 }
             });
@@ -1510,6 +1626,9 @@
 
         function openFullscreen(url, label = '') {
             event.stopPropagation();
+
+            // Set context to explorer (opened from modal)
+            fullscreenContext = 'explorer';
 
             // Build the images array if not already built
             if (fullscreenImages.length === 0) {
@@ -1552,6 +1671,15 @@
             const nextBtn = document.getElementById('fullscreenNextBtn');
             prevBtn.disabled = currentFullscreenIndex <= 0;
             nextBtn.disabled = currentFullscreenIndex >= fullscreenImages.length - 1;
+
+            // Update selection button (hide for fisheye)
+            const selectBtn = document.getElementById('fullscreenSelectBtn');
+            if (currentImage.label === 'Original Fisheye') {
+                selectBtn.style.display = 'none';
+            } else {
+                selectBtn.style.display = 'flex';
+                updateFullscreenSelectionButton(currentImage.label);
+            }
         }
 
         function navigateFullscreen(direction) {
@@ -1569,85 +1697,394 @@
             // Reset fullscreen images when closing
             fullscreenImages = [];
             currentFullscreenIndex = -1;
+            fullscreenContext = 'explorer';
+        }
+
+        // Selection functions
+        function getImageIdentifier(imageKey, label) {
+            return `${imageKey}|${label}`;
+        }
+
+        function isImageSelected(imageKey, label) {
+            const identifier = getImageIdentifier(imageKey, label);
+            return selectedImages.some(img => getImageIdentifier(img.imageKey, img.label) === identifier);
+        }
+
+        function toggleImageSelection(url, label, s3Key = '') {
+            const identifier = getImageIdentifier(currentImageKey, label);
+            const index = selectedImages.findIndex(img => getImageIdentifier(img.imageKey, img.label) === identifier);
+
+            if (index >= 0) {
+                // Remove from selection
+                selectedImages.splice(index, 1);
+            } else {
+                // Add to selection
+                selectedImages.push({
+                    url: url,
+                    label: label,
+                    imageKey: currentImageKey,
+                    filename: currentImageFilename,
+                    s3Key: s3Key
+                });
+            }
+
+            updateSelectionUI();
+            updateSelectedCount();
+            updateImageGridSelectionBadges();
+        }
+
+        function updateSelectionUI() {
+            // Update checkboxes in modal
+            document.querySelectorAll('.unwarped-item:not(.fisheye):not(.not-available)').forEach(item => {
+                const label = item.dataset.label;
+                const checkbox = item.querySelector('.selection-checkbox');
+                if (label && checkbox) {
+                    const selected = isImageSelected(currentImageKey, label);
+                    checkbox.checked = selected;
+                    if (selected) {
+                        item.classList.add('selected');
+                    } else {
+                        item.classList.remove('selected');
+                    }
+                }
+            });
+
+            // Update fullscreen toggle button if visible
+            const fullscreenViewer = document.getElementById('fullscreenViewer');
+            if (fullscreenViewer.classList.contains('show') && fullscreenImages.length > 0) {
+                const currentImage = fullscreenImages[currentFullscreenIndex];
+                updateFullscreenSelectionButton(currentImage.label);
+            }
+        }
+
+        function updateFullscreenSelectionButton(label) {
+            const btn = document.getElementById('fullscreenSelectBtn');
+            if (!btn) return;
+
+            let selected = false;
+
+            if (fullscreenContext === 'process') {
+                // In process tab, check the deselected state
+                const currentImage = fullscreenImages[currentFullscreenIndex];
+                selected = !currentImage.deselected;
+
+                // Update button text for process context
+                if (selected) {
+                    btn.classList.add('selected');
+                    btn.innerHTML = '<span class="checkmark">&#10003;</span> Enabled';
+                } else {
+                    btn.classList.remove('selected');
+                    btn.innerHTML = 'Enable Image';
+                }
+            } else {
+                // In explorer tab, check if image is in selectedImages
+                selected = isImageSelected(currentImageKey, label);
+
+                if (selected) {
+                    btn.classList.add('selected');
+                    btn.innerHTML = '<span class="checkmark">&#10003;</span> Selected';
+                } else {
+                    btn.classList.remove('selected');
+                    btn.innerHTML = 'Select Image';
+                }
+            }
+        }
+
+        function toggleCurrentFullscreenSelection() {
+            if (fullscreenImages.length === 0 || currentFullscreenIndex < 0) return;
+
+            const currentImage = fullscreenImages[currentFullscreenIndex];
+            // Don't allow selecting the fisheye image
+            if (currentImage.label === 'Original Fisheye') return;
+
+            if (fullscreenContext === 'process') {
+                // In process tab, toggle the deselected state
+                if (typeof currentImage.originalIndex !== 'undefined' && currentImage.originalIndex >= 0) {
+                    toggleImageInProcess(currentImage.originalIndex);
+                    // Sync the fullscreen image state with the actual selectedImages state
+                    fullscreenImages[currentFullscreenIndex].deselected = selectedImages[currentImage.originalIndex].deselected;
+                    updateFullscreenDisplay();
+                }
+            } else {
+                // In explorer tab, use normal selection toggle
+                toggleImageSelection(currentImage.url, currentImage.label);
+            }
+        }
+
+        function updateSelectedCount() {
+            const countEl = document.getElementById('selectedImageCount');
+            const countValue = document.getElementById('selectedImageCountValue');
+            const processBtn = document.getElementById('processImageBtn');
+            const modalProcessBtn = document.getElementById('modalProcessButton');
+
+            if (countValue) {
+                countValue.textContent = selectedImages.length;
+            }
+
+            if (processBtn) {
+                if (selectedImages.length > 0) {
+                    processBtn.disabled = false;
+                    processBtn.title = '';
+                } else {
+                    processBtn.disabled = true;
+                    processBtn.title = 'Select an image to process first';
+                }
+            }
+
+            if (modalProcessBtn) {
+                if (selectedImages.length > 0) {
+                    modalProcessBtn.style.display = 'block';
+                } else {
+                    modalProcessBtn.style.display = 'none';
+                }
+            }
+        }
+
+        function goToProcessTab() {
+            // Switch to the process tab
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+            const processTab = document.querySelector('.tab[data-tab="process"]');
+            processTab.classList.add('active');
+            document.getElementById('process').classList.add('active');
+
+            // Close modal if open
+            closeModal();
+
+            // Render the process tab
+            renderProcessTab();
+        }
+
+        function getSelectionCountForImage(imageKey) {
+            return selectedImages.filter(img => img.imageKey === imageKey).length;
+        }
+
+        function updateImageGridSelectionBadges() {
+            // Update all image cards to show/hide selection badges
+            document.querySelectorAll('.image-card').forEach(card => {
+                const imageKey = card.dataset.imageKey;
+                if (imageKey) {
+                    const count = getSelectionCountForImage(imageKey);
+                    let badge = card.querySelector('.selection-badge');
+
+                    if (count > 0) {
+                        card.classList.add('has-selection');
+                        if (!badge) {
+                            badge = document.createElement('div');
+                            badge.className = 'selection-badge';
+                            card.appendChild(badge);
+                        }
+                        badge.innerHTML = `<span>&#10003;</span> ${count}`;
+                    } else {
+                        card.classList.remove('has-selection');
+                        if (badge) {
+                            badge.remove();
+                        }
+                    }
+                }
+            });
         }
 
         // Process tab functions
-        async function loadImagesForProcessing() {
-            const date = document.getElementById('processDate').value;
-            if (!date) return;
+        function renderProcessTab() {
+            const grid = document.getElementById('selectedImagesGrid');
+            const countEl = document.getElementById('processSelectedCount');
+            const processBtn = document.getElementById('processBtn');
+            const helpText = document.getElementById('processTabHelp');
 
-            const select = document.getElementById('processImageSelect');
-            select.innerHTML = '<option value="">Loading...</option>';
+            // Count only enabled (not deselected) images
+            const enabledImages = selectedImages.filter(img => !img.deselected);
+            countEl.textContent = enabledImages.length;
 
-            try {
-                const response = await fetch(`/api/images?date=${date}`);
-                const data = await response.json();
+            if (selectedImages.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <p style="color: #666;">No images selected yet.</p>
+                        <p style="color: #888; font-size: 0.9em; margin-top: 10px;">Go to the Image Explorer tab and select unwarped images to process.</p>
+                    </div>
+                `;
+                processBtn.disabled = true;
+                helpText.style.display = 'block';
+                return;
+            }
 
-                if (data.count === 0) {
-                    select.innerHTML = '<option value="">No images found</option>';
-                    return;
+            // Hide help text when images are selected
+            helpText.style.display = 'none';
+            processBtn.disabled = enabledImages.length === 0;
+
+            // Group images by imageKey (same fisheye source)
+            const groupedImages = {};
+            selectedImages.forEach((img, index) => {
+                if (!groupedImages[img.imageKey]) {
+                    groupedImages[img.imageKey] = [];
                 }
+                groupedImages[img.imageKey].push({ ...img, originalIndex: index });
+            });
 
-                select.innerHTML = '<option value="">-- Select an image --</option>' +
-                    data.images.map(img => `
-                        <option value="${img.key}" data-url="${img.url}">${img.filename} (${img.time})</option>
-                    `).join('');
-            } catch (error) {
-                select.innerHTML = `<option value="">Error: ${error.message}</option>`;
+            // Render groups as rows
+            let html = '';
+            for (const [imageKey, images] of Object.entries(groupedImages)) {
+                // Create a row for each fisheye source
+                html += '<div style="margin-bottom: 20px; padding: 15px; background: #0a2a4a; border-radius: 8px;">';
+
+                // Add a label for the group
+                html += `<div style="color: #e94560; font-weight: 600; margin-bottom: 10px;">From: ${images[0].filename}</div>`;
+
+                // Create a grid that adapts to the number of images
+                html += `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">`;
+
+                images.forEach(img => {
+                    const isDeselected = img.deselected;
+                    const opacity = isDeselected ? '0.4' : '1';
+                    const borderColor = isDeselected ? '#666' : '#4CAF50';
+
+                    html += `
+                        <div class="unwarped-item ${isDeselected ? '' : 'selected'}" style="opacity: ${opacity}; border-color: ${borderColor};">
+                            <div class="direction" style="${isDeselected ? 'background: #666;' : ''}">
+                                <span>${img.label}</span>
+                                <button onclick="toggleImageInProcess(${img.originalIndex}); event.stopPropagation();"
+                                        style="background: none; border: none; color: white; cursor: pointer; font-size: 18px;"
+                                        title="${isDeselected ? 'Reselect image' : 'Deselect image'}">
+                                    ${isDeselected ? '&#10003;' : '&#10005;'}
+                                </button>
+                            </div>
+                            <img src="${img.url}" alt="${img.label}" onclick="openProcessFullscreen(${img.originalIndex})" style="cursor: zoom-in; width: 100%; height: auto; display: block;">
+                            <div style="padding: 10px; background: #1a4a8a; font-size: 0.85em; color: #ddd;">
+                                ${img.s3Key ? `<div style="word-break: break-all; color: #888;"><strong>S3:</strong> ${img.s3Key}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += '</div>'; // Close grid
+                html += '</div>'; // Close group container
+            }
+
+            grid.innerHTML = html;
+        }
+
+        function toggleImageInProcess(index) {
+            if (index >= 0 && index < selectedImages.length) {
+                // Toggle the deselected state
+                selectedImages[index].deselected = !selectedImages[index].deselected;
+                renderProcessTab();
             }
         }
 
-        function onProcessImageSelect() {
-            const select = document.getElementById('processImageSelect');
-            const preview = document.getElementById('processPreview');
-            const previewImg = document.getElementById('processPreviewImg');
-            const btn = document.getElementById('processBtn');
+        function openProcessFullscreen(index) {
+            if (index < 0 || index >= selectedImages.length) return;
 
-            if (select.value) {
-                const option = select.options[select.selectedIndex];
-                previewImg.src = option.dataset.url;
-                preview.style.display = 'block';
-                btn.disabled = false;
-            } else {
-                preview.style.display = 'none';
-                btn.disabled = true;
-            }
+            // Set context to process tab
+            fullscreenContext = 'process';
+
+            // Build fullscreen images from selected images, including the originalIndex
+            fullscreenImages = selectedImages.map((img, idx) => ({
+                url: img.url,
+                label: img.label,
+                originalIndex: idx,
+                deselected: img.deselected || false
+            }));
+            currentFullscreenIndex = index;
+
+            updateFullscreenDisplay();
+            document.getElementById('fullscreenViewer').classList.add('show');
         }
 
-        async function processImage() {
-            const select = document.getElementById('processImageSelect');
+        async function processSelectedImages() {
             const prompt = document.getElementById('processPrompt').value;
             const status = document.getElementById('processStatus');
             const btn = document.getElementById('processBtn');
 
-            if (!select.value) return;
+            // Only process images that are not deselected
+            const imagesToProcess = selectedImages.filter(img => !img.deselected);
 
-            const s3Uri = `s3://vibecast-ftp/${select.value}`;
+            if (imagesToProcess.length === 0) return;
 
             status.className = 'processing-status loading';
-            status.innerHTML = '<div class="spinner"></div> Processing image... This may take a moment.';
+            status.innerHTML = '<div class="spinner"></div> Processing selected images... This may take a while.';
             btn.disabled = true;
 
             try {
-                const response = await fetch('/api/process', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        s3_uri: s3Uri,
-                        prompt: prompt || null
-                    })
-                });
+                // Process each selected image
+                let results = [];
+                let errors = [];
 
-                const data = await response.json();
+                for (let i = 0; i < imagesToProcess.length; i++) {
+                    const img = imagesToProcess[i];
+                    status.innerHTML = `<div class="spinner"></div> Processing ${i + 1}/${imagesToProcess.length}: ${img.label} (${img.filename})...`;
 
-                if (response.ok) {
+                    try {
+                        // If we have an s3Key, use it; otherwise construct from imageKey
+                        const s3Uri = img.s3Key ? `s3://vibecast-ftp/${img.s3Key}` : `s3://vibecast-ftp/${img.imageKey}`;
+
+                        const response = await fetch('/api/process', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                s3_uri: s3Uri,
+                                prompt: prompt || null,
+                                direction: img.label
+                            })
+                        });
+
+                        const data = await response.json();
+
+                        if (response.ok) {
+                            results.push({ image: img, result: data });
+                        } else {
+                            errors.push({ image: img, error: data.detail || 'Processing failed' });
+                        }
+                    } catch (error) {
+                        errors.push({ image: img, error: error.message });
+                    }
+                }
+
+                // Show results
+                if (errors.length === 0) {
                     status.className = 'processing-status success';
                     status.innerHTML = `
-                        <strong>Processing complete!</strong><br>
-                        <pre style="margin-top: 10px; white-space: pre-wrap; font-size: 12px;">${JSON.stringify(data, null, 2)}</pre>
+                        <strong>All ${results.length} images processed successfully!</strong><br>
+                        <div style="margin-top: 10px; max-height: 300px; overflow-y: auto;">
+                            ${results.map(r => `
+                                <div style="margin: 10px 0; padding: 10px; background: rgba(76, 175, 80, 0.1); border-radius: 4px;">
+                                    <strong>${r.image.label}</strong> - ${r.image.filename}<br>
+                                    <pre style="margin-top: 5px; white-space: pre-wrap; font-size: 11px;">${JSON.stringify(r.result, null, 2)}</pre>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                } else if (results.length === 0) {
+                    status.className = 'processing-status error';
+                    status.innerHTML = `
+                        <strong>All images failed to process</strong><br>
+                        <div style="margin-top: 10px; max-height: 300px; overflow-y: auto;">
+                            ${errors.map(e => `
+                                <div style="margin: 10px 0; padding: 10px; background: rgba(244, 67, 54, 0.1); border-radius: 4px;">
+                                    <strong>${e.image.label}</strong> - ${e.image.filename}<br>
+                                    Error: ${e.error}
+                                </div>
+                            `).join('')}
+                        </div>
                     `;
                 } else {
-                    throw new Error(data.detail || 'Processing failed');
+                    status.className = 'processing-status success';
+                    status.innerHTML = `
+                        <strong>Processed ${results.length} successfully, ${errors.length} failed</strong><br>
+                        <div style="margin-top: 10px; max-height: 300px; overflow-y: auto;">
+                            ${results.map(r => `
+                                <div style="margin: 10px 0; padding: 10px; background: rgba(76, 175, 80, 0.1); border-radius: 4px;">
+                                    <strong>✓ ${r.image.label}</strong> - ${r.image.filename}
+                                </div>
+                            `).join('')}
+                            ${errors.map(e => `
+                                <div style="margin: 10px 0; padding: 10px; background: rgba(244, 67, 54, 0.1); border-radius: 4px;">
+                                    <strong>✗ ${e.image.label}</strong> - ${e.image.filename}<br>
+                                    Error: ${e.error}
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
                 }
             } catch (error) {
                 status.className = 'processing-status error';
