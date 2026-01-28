@@ -1,0 +1,1420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vibecast Viewer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: #16213e;
+            padding: 20px 30px;
+            border-bottom: 1px solid #0f3460;
+        }
+
+        .header h1 {
+            color: #e94560;
+            font-size: 1.8em;
+        }
+
+        .header p {
+            color: #888;
+            margin-top: 5px;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            background: #16213e;
+            border-bottom: 2px solid #0f3460;
+        }
+
+        .tab {
+            padding: 15px 30px;
+            cursor: pointer;
+            color: #888;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .tab:hover {
+            color: #ccc;
+            background: rgba(233, 69, 96, 0.1);
+        }
+
+        .tab.active {
+            color: #e94560;
+            border-bottom-color: #e94560;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 30px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Panels */
+        .panel {
+            background: #16213e;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 1px solid #0f3460;
+        }
+
+        .panel h2 {
+            color: #e94560;
+            margin-bottom: 20px;
+            font-size: 1.2em;
+        }
+
+        .panel h3 {
+            color: #ddd;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+
+        /* Form elements */
+        .form-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            align-items: flex-end;
+        }
+
+        .form-group {
+            flex: 1;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #aaa;
+            font-size: 0.9em;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px 12px;
+            background: #0f3460;
+            border: 1px solid #1a4a8a;
+            border-radius: 4px;
+            color: #eee;
+            font-size: 14px;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #e94560;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #e94560;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #d63651;
+        }
+
+        .btn-secondary {
+            background: #0f3460;
+            color: #ddd;
+            border: 1px solid #1a4a8a;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #1a4a8a;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Stats */
+        .stats-row {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+        }
+
+        .stat-box {
+            background: #0f3460;
+            padding: 15px 20px;
+            border-radius: 8px;
+            text-align: center;
+            flex: 1;
+        }
+
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #e94560;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 0.85em;
+            margin-top: 5px;
+        }
+
+        /* Image grid */
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .image-card {
+            background: #0f3460;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .image-card:hover {
+            border-color: #e94560;
+            transform: translateY(-2px);
+        }
+
+        .image-card.selected {
+            border-color: #4CAF50;
+        }
+
+        .image-card img {
+            width: 100%;
+            aspect-ratio: 4/3;
+            object-fit: cover;
+        }
+
+        .image-card .info {
+            padding: 12px;
+        }
+
+        .image-card .filename {
+            font-weight: 500;
+            color: #ddd;
+            font-size: 0.9em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .image-card .time {
+            color: #888;
+            font-size: 0.8em;
+            margin-top: 4px;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            overflow-y: auto;
+            padding: 40px 20px;
+        }
+
+        .modal-overlay.show {
+            display: block;
+        }
+
+        .modal-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #16213e;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 25px;
+            border-bottom: 1px solid #0f3460;
+        }
+
+        .modal-header h3 {
+            color: #e94560;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 28px;
+            cursor: pointer;
+            padding: 0 10px;
+        }
+
+        .modal-close:hover {
+            color: #e94560;
+        }
+
+        .modal-body {
+            padding: 25px;
+        }
+
+        /* Unwarped grid */
+        .unwarped-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .unwarped-item {
+            background: #0f3460;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .unwarped-item.not-available {
+            opacity: 0.5;
+        }
+
+        .unwarped-item .direction {
+            padding: 10px 15px;
+            background: #1a4a8a;
+            font-weight: 500;
+            text-transform: capitalize;
+        }
+
+        .unwarped-item img {
+            width: 100%;
+            display: block;
+        }
+
+        .unwarped-item .not-found {
+            padding: 40px;
+            text-align: center;
+            color: #666;
+        }
+
+        /* Processing */
+        .process-form {
+            max-width: 800px;
+        }
+
+        .selected-image-preview {
+            margin: 20px 0;
+            display: none;
+        }
+
+        .selected-image-preview img {
+            max-width: 400px;
+            border-radius: 8px;
+        }
+
+        .processing-status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .processing-status.loading {
+            display: block;
+            background: #0f3460;
+            color: #888;
+        }
+
+        .processing-status.success {
+            display: block;
+            background: rgba(76, 175, 80, 0.2);
+            color: #4CAF50;
+        }
+
+        .processing-status.error {
+            display: block;
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+        }
+
+        /* Results */
+        .results-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .result-card {
+            background: #0f3460;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .result-header {
+            padding: 15px 20px;
+            background: #1a4a8a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .result-header:hover {
+            background: #234a8a;
+        }
+
+        .result-body {
+            padding: 20px;
+            display: none;
+        }
+
+        .result-body.show {
+            display: block;
+        }
+
+        .result-images {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .result-image-item {
+            background: #16213e;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .result-image-item img {
+            width: 100%;
+        }
+
+        .result-image-item .analysis {
+            padding: 15px;
+        }
+
+        .analysis-field {
+            margin-bottom: 10px;
+        }
+
+        .analysis-field .label {
+            color: #888;
+            font-size: 0.85em;
+            text-transform: uppercase;
+        }
+
+        .analysis-field .value {
+            color: #ddd;
+            margin-top: 4px;
+        }
+
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #444;
+            border-top-color: #e94560;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Fullscreen image viewer */
+        .fullscreen-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 2000;
+            cursor: zoom-out;
+        }
+
+        .fullscreen-overlay.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .fullscreen-overlay img {
+            max-width: 95%;
+            max-height: 95vh;
+            object-fit: contain;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+
+        /* Date range selector */
+        .date-range-selector {
+            background: #0f3460;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .date-range-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .date-range-header:hover {
+            background: #1a4a8a;
+        }
+
+        .date-range-header .summary {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .date-range-header .summary-icon {
+            color: #e94560;
+            font-size: 1.2em;
+        }
+
+        .date-range-header .summary-text {
+            color: #ddd;
+        }
+
+        .date-range-header .summary-text .highlight {
+            color: #e94560;
+            font-weight: 600;
+        }
+
+        .date-range-header .toggle-icon {
+            color: #888;
+            transition: transform 0.2s;
+        }
+
+        .date-range-selector.open .toggle-icon {
+            transform: rotate(180deg);
+        }
+
+        .date-range-body {
+            display: none;
+            padding: 20px;
+            border-top: 1px solid #1a4a8a;
+            background: #0a2a4a;
+        }
+
+        .date-range-selector.open .date-range-body {
+            display: block;
+        }
+
+        .date-time-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .date-time-group {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .date-time-group h4 {
+            color: #e94560;
+            margin-bottom: 12px;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .date-time-inputs {
+            display: flex;
+            gap: 10px;
+        }
+
+        .date-time-inputs .form-group {
+            flex: 1;
+        }
+
+        .date-range-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            justify-content: flex-end;
+        }
+
+        .quick-select {
+            display: flex;
+            gap: 8px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .quick-select-btn {
+            padding: 6px 12px;
+            background: #16213e;
+            border: 1px solid #1a4a8a;
+            border-radius: 4px;
+            color: #aaa;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: all 0.2s;
+        }
+
+        .quick-select-btn:hover {
+            background: #1a4a8a;
+            color: #ddd;
+        }
+
+        .quick-select-btn.active {
+            background: #e94560;
+            border-color: #e94560;
+            color: white;
+        }
+
+        .input-clickable {
+            cursor: pointer;
+        }
+
+        .input-clickable:hover input {
+            border-color: #e94560;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Vibecast Viewer</h1>
+        <p>Explore, process, and analyze fisheye images from S3</p>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" data-tab="explorer">Raw Image Explorer</div>
+        <div class="tab" data-tab="process">Process Images</div>
+        <div class="tab" data-tab="results">Result Explorer</div>
+    </div>
+
+    <!-- Tab 1: Raw Image Explorer -->
+    <div id="explorer" class="tab-content active">
+        <div class="panel">
+            <h2>Image Distribution</h2>
+            <div id="histogramContainer">
+                <canvas id="histogram" height="200"></canvas>
+            </div>
+            <div class="stats-row" id="globalStats">
+                <div class="stat-box">
+                    <div class="stat-value" id="totalImages">-</div>
+                    <div class="stat-label">Total Images</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="totalDays">-</div>
+                    <div class="stat-label">Days with Photos</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="dateRange">-</div>
+                    <div class="stat-label">Date Range</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Browse Images - Select Date & Time Range</h2>
+
+            <!-- Date Range Selector -->
+            <div class="date-range-selector" id="dateRangeSelector">
+                <div class="date-range-header" onclick="openDateSelector()">
+                    <div class="summary">
+                        <span class="summary-icon">&#128197;</span>
+                        <span class="summary-text" id="dateRangeSummary">
+                            <span class="highlight" id="summaryFrom">{{ default_date }}</span>
+                            <span style="color: #666;"> to </span>
+                            <span class="highlight" id="summaryTo">{{ default_date }}</span>
+                            <span style="color: #666; margin-left: 10px;">|</span>
+                            <span style="color: #888; margin-left: 10px;" id="summaryTime">00:00 - 23:59</span>
+                        </span>
+                    </div>
+                    <span class="toggle-icon">&#9660;</span>
+                </div>
+                <div class="date-range-body">
+                    <div class="date-time-row">
+                        <div class="date-time-group">
+                            <h4>From</h4>
+                            <div class="date-time-inputs">
+                                <div class="form-group input-clickable" onclick="this.querySelector('input').showPicker()">
+                                    <label>Date</label>
+                                    <input type="date" id="fromDate" value="{{ default_date }}" onchange="updateDateSummary()">
+                                </div>
+                                <div class="form-group input-clickable" onclick="this.querySelector('input').showPicker()">
+                                    <label>Time</label>
+                                    <input type="time" id="fromTime" value="00:00" onchange="updateDateSummary()">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="date-time-group">
+                            <h4>To</h4>
+                            <div class="date-time-inputs">
+                                <div class="form-group input-clickable" onclick="this.querySelector('input').showPicker()">
+                                    <label>Date</label>
+                                    <input type="date" id="toDate" value="{{ default_date }}" onchange="updateDateSummary()">
+                                </div>
+                                <div class="form-group input-clickable" onclick="this.querySelector('input').showPicker()">
+                                    <label>Time</label>
+                                    <input type="time" id="toTime" value="23:59" onchange="updateDateSummary()">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="quick-select">
+                        <span style="color: #888; font-size: 0.85em; margin-right: 8px;">Quick select:</span>
+                        <button class="quick-select-btn" onclick="quickSelect('today')">Today</button>
+                        <button class="quick-select-btn" onclick="quickSelect('yesterday')">Yesterday</button>
+                        <button class="quick-select-btn" onclick="quickSelect('week')">Last 7 days</button>
+                        <button class="quick-select-btn" onclick="quickSelect('month')">Last 30 days</button>
+                        <button class="quick-select-btn" onclick="quickSelect('morning')">Morning (6-12)</button>
+                        <button class="quick-select-btn" onclick="quickSelect('afternoon')">Afternoon (12-18)</button>
+                        <button class="quick-select-btn" onclick="quickSelect('evening')">Evening (18-24)</button>
+                    </div>
+
+                    <div class="date-range-actions">
+                        <button class="btn btn-secondary" onclick="resetDateRange()">Reset</button>
+                        <button class="btn btn-primary" onclick="loadImagesForRange()">Load Images</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Auto-unwarp checkbox -->
+            <div style="margin: 20px 0; padding: 15px; background: #0f3460; border-radius: 8px; display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" id="autoUnwarpCheckbox" style="width: auto; cursor: pointer;">
+                <label for="autoUnwarpCheckbox" style="color: #ddd; cursor: pointer; margin: 0;">
+                    Automatically unwarp images (calls Lambda to process images without unwarped views)
+                </label>
+            </div>
+
+            <div id="imageGridContainer">
+                <div class="stats-row" id="dayStats" style="display: none;">
+                    <div class="stat-box">
+                        <div class="stat-value" id="dayImageCount">0</div>
+                        <div class="stat-label">Images in range</div>
+                    </div>
+                </div>
+                <div class="image-grid" id="imageGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab 2: Process Images -->
+    <div id="process" class="tab-content">
+        <div class="panel">
+            <h2>Process Image with Lambda</h2>
+            <div class="process-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="processDate">Select Date</label>
+                        <input type="date" id="processDate" value="{{ default_date }}">
+                    </div>
+                    <button class="btn btn-secondary" onclick="loadImagesForProcessing()">Load Images</button>
+                </div>
+
+                <div class="form-group">
+                    <label for="processImageSelect">Select Image</label>
+                    <select id="processImageSelect" onchange="onProcessImageSelect()">
+                        <option value="">-- Load images first --</option>
+                    </select>
+                </div>
+
+                <div class="selected-image-preview" id="processPreview">
+                    <img id="processPreviewImg" src="" alt="Selected image">
+                </div>
+
+                <div class="form-group">
+                    <label for="processPrompt">Prompt (optional)</label>
+                    <textarea id="processPrompt" rows="4" placeholder="Enter a custom prompt for the analysis..."></textarea>
+                </div>
+
+                <button class="btn btn-primary" id="processBtn" onclick="processImage()" disabled>
+                    Process Image
+                </button>
+
+                <div class="processing-status" id="processStatus"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab 3: Result Explorer -->
+    <div id="results" class="tab-content">
+        <div class="panel">
+            <h2>Analysis Results</h2>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="resultsDate">Filter by Date (optional)</label>
+                    <input type="date" id="resultsDate">
+                </div>
+                <button class="btn btn-primary" onclick="loadResults()">Load Results</button>
+                <button class="btn btn-secondary" onclick="loadAllResults()">Load All</button>
+            </div>
+
+            <div class="results-list" id="resultsList"></div>
+        </div>
+    </div>
+
+    <!-- Modal for unwarped images -->
+    <div class="modal-overlay" id="unwarpedModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Unwarped Views</h3>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button class="btn btn-primary" id="unwarpButton" onclick="manualUnwarp()" style="display: none;">
+                        Unwarp This Image
+                    </button>
+                    <span id="unwarpStatus" style="color: #888; font-size: 0.9em;"></span>
+                    <button class="modal-close" onclick="closeModal()">&times;</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="unwarped-grid" id="unwarpedGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fullscreen image viewer -->
+    <div class="fullscreen-overlay" id="fullscreenViewer" onclick="closeFullscreen()">
+        <img id="fullscreenImg" src="" alt="">
+    </div>
+
+    <script>
+        let histogramChart = null;
+        let statsData = null;
+        let currentImages = [];
+        let currentImageKey = null;
+        let currentImageFilename = null;
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+
+                // Load data when switching to results tab
+                if (tab.dataset.tab === 'results') {
+                    loadAllResults();
+                }
+            });
+        });
+
+        // Date Range Selector Functions
+        function toggleDateRangeSelector() {
+            document.getElementById('dateRangeSelector').classList.toggle('open');
+        }
+
+        function openDateSelector() {
+            document.getElementById('dateRangeSelector').classList.add('open');
+        }
+
+        function updateDateSummary() {
+            const fromDate = document.getElementById('fromDate').value;
+            const toDate = document.getElementById('toDate').value;
+            const fromTime = document.getElementById('fromTime').value;
+            const toTime = document.getElementById('toTime').value;
+
+            document.getElementById('summaryFrom').textContent = fromDate;
+            document.getElementById('summaryTo').textContent = toDate;
+            document.getElementById('summaryTime').textContent = `${fromTime} - ${toTime}`;
+        }
+
+        function quickSelect(preset) {
+            const today = new Date();
+            const todayStr = today.toISOString().split('T')[0];
+
+            let fromDate = todayStr;
+            let toDate = todayStr;
+            let fromTime = '00:00';
+            let toTime = '23:59';
+
+            switch (preset) {
+                case 'today':
+                    fromDate = toDate = todayStr;
+                    break;
+                case 'yesterday':
+                    const yesterday = new Date(today);
+                    yesterday.setDate(yesterday.getDate() - 1);
+                    fromDate = toDate = yesterday.toISOString().split('T')[0];
+                    break;
+                case 'week':
+                    const weekAgo = new Date(today);
+                    weekAgo.setDate(weekAgo.getDate() - 7);
+                    fromDate = weekAgo.toISOString().split('T')[0];
+                    toDate = todayStr;
+                    break;
+                case 'month':
+                    const monthAgo = new Date(today);
+                    monthAgo.setDate(monthAgo.getDate() - 30);
+                    fromDate = monthAgo.toISOString().split('T')[0];
+                    toDate = todayStr;
+                    break;
+                case 'morning':
+                    fromTime = '06:00';
+                    toTime = '12:00';
+                    break;
+                case 'afternoon':
+                    fromTime = '12:00';
+                    toTime = '18:00';
+                    break;
+                case 'evening':
+                    fromTime = '18:00';
+                    toTime = '23:59';
+                    break;
+            }
+
+            document.getElementById('fromDate').value = fromDate;
+            document.getElementById('toDate').value = toDate;
+            document.getElementById('fromTime').value = fromTime;
+            document.getElementById('toTime').value = toTime;
+            updateDateSummary();
+
+            // Update quick select button styles
+            document.querySelectorAll('.quick-select-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        function resetDateRange() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('fromDate').value = today;
+            document.getElementById('toDate').value = today;
+            document.getElementById('fromTime').value = '00:00';
+            document.getElementById('toTime').value = '23:59';
+            updateDateSummary();
+            document.querySelectorAll('.quick-select-btn').forEach(btn => btn.classList.remove('active'));
+        }
+
+        function setDateFromHistogram(date) {
+            document.getElementById('fromDate').value = date;
+            document.getElementById('toDate').value = date;
+            document.getElementById('fromTime').value = '00:00';
+            document.getElementById('toTime').value = '23:59';
+            updateDateSummary();
+
+            // Clear quick select buttons
+            document.querySelectorAll('.quick-select-btn').forEach(btn => btn.classList.remove('active'));
+
+            // Automatically load images for the selected date
+            loadImagesForRange();
+        }
+
+        // Load stats and histogram on page load
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                statsData = await response.json();
+
+                document.getElementById('totalImages').textContent = statsData.total_images.toLocaleString();
+                document.getElementById('totalDays').textContent = statsData.total_days;
+
+                if (statsData.first_date && statsData.last_date) {
+                    document.getElementById('dateRange').textContent =
+                        `${statsData.first_date} to ${statsData.last_date}`;
+                }
+
+                renderHistogram(statsData);
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        }
+
+        function renderHistogram(data) {
+            const ctx = document.getElementById('histogram').getContext('2d');
+
+            if (histogramChart) {
+                histogramChart.destroy();
+            }
+
+            histogramChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.dates,
+                    datasets: [{
+                        label: 'Images',
+                        data: data.counts,
+                        backgroundColor: 'rgba(233, 69, 96, 0.6)',
+                        borderColor: 'rgba(233, 69, 96, 1)',
+                        borderWidth: 1,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            const index = elements[0].index;
+                            const selectedDate = data.dates[index];
+                            setDateFromHistogram(selectedDate);
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (item) => `${item.parsed.y} images - click to select`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'day',
+                                displayFormats: { day: 'MMM d' }
+                            },
+                            grid: { display: false },
+                            ticks: { color: '#888' }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#888', precision: 0 }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function loadImagesForRange() {
+            const fromDate = document.getElementById('fromDate').value;
+            const toDate = document.getElementById('toDate').value;
+            const fromTime = document.getElementById('fromTime').value;
+            const toTime = document.getElementById('toTime').value;
+
+            if (!fromDate || !toDate) return;
+
+            const grid = document.getElementById('imageGrid');
+            grid.innerHTML = '<div class="empty-state"><div class="spinner"></div> Loading...</div>';
+
+            // Collapse the selector
+            document.getElementById('dateRangeSelector').classList.remove('open');
+
+            try {
+                const params = new URLSearchParams({
+                    from_date: fromDate,
+                    to_date: toDate,
+                    from_time: fromTime,
+                    to_time: toTime
+                });
+                const response = await fetch(`/api/images?${params}`);
+                const data = await response.json();
+
+                currentImages = data.images;
+
+                document.getElementById('dayStats').style.display = 'flex';
+                document.getElementById('dayImageCount').textContent = data.count;
+
+                if (data.count === 0) {
+                    grid.innerHTML = '<div class="empty-state">No images found in this range</div>';
+                    return;
+                }
+
+                grid.innerHTML = data.images.map(img => `
+                    <div class="image-card" onclick="showUnwarped('${img.key}', '${img.filename}')">
+                        <img src="${img.url}" alt="${img.filename}" loading="lazy">
+                        <div class="info">
+                            <div class="filename">${img.filename}</div>
+                            <div class="time">${img.date} ${img.time}</div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                grid.innerHTML = `<div class="empty-state">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function showUnwarped(imageKey, filename) {
+            const modal = document.getElementById('unwarpedModal');
+            const grid = document.getElementById('unwarpedGrid');
+            const title = document.getElementById('modalTitle');
+            const unwarpButton = document.getElementById('unwarpButton');
+            const unwarpStatus = document.getElementById('unwarpStatus');
+
+            // Store current image info globally
+            currentImageKey = imageKey;
+            currentImageFilename = filename;
+
+            title.textContent = filename;
+            grid.innerHTML = '<div class="empty-state"><div class="spinner"></div> Loading unwarped images...</div>';
+            unwarpButton.style.display = 'none';
+            unwarpStatus.textContent = '';
+            modal.classList.add('show');
+
+            try {
+                const response = await fetch(`/api/unwarped?image_key=${encodeURIComponent(imageKey)}`);
+                const data = await response.json();
+
+                const directions = ['north', 'east', 'south', 'west', 'below'];
+
+                // Check if any unwarped images exist
+                const anyExist = directions.some(dir => data.unwarped[dir]?.exists);
+
+                // Show unwarp button if no images exist
+                if (!anyExist) {
+                    unwarpButton.style.display = 'block';
+                }
+
+                grid.innerHTML = directions.map(dir => {
+                    const item = data.unwarped[dir];
+                    if (item && item.exists) {
+                        return `
+                            <div class="unwarped-item">
+                                <div class="direction">${item.direction}</div>
+                                <img src="${item.url}" alt="${item.direction}" onclick="openFullscreen('${item.url}')">
+                            </div>
+                        `;
+                    } else {
+                        return `
+                            <div class="unwarped-item not-available">
+                                <div class="direction">${dir}</div>
+                                <div class="not-found">Not available</div>
+                            </div>
+                        `;
+                    }
+                }).join('');
+
+                // Check if auto-unwarp is enabled
+                const autoUnwarp = document.getElementById('autoUnwarpCheckbox').checked;
+                if (autoUnwarp && !anyExist) {
+                    // Automatically trigger unwarp
+                    await triggerUnwarp();
+                }
+            } catch (error) {
+                grid.innerHTML = `<div class="empty-state">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function triggerUnwarp() {
+            const unwarpButton = document.getElementById('unwarpButton');
+            const unwarpStatus = document.getElementById('unwarpStatus');
+            const grid = document.getElementById('unwarpedGrid');
+
+            if (!currentImageKey) return;
+
+            unwarpButton.disabled = true;
+            unwarpStatus.innerHTML = '<div class="spinner"></div> Unwarping...';
+            grid.innerHTML = '<div class="empty-state"><div class="spinner"></div> Processing image with Lambda...</div>';
+
+            try {
+                const response = await fetch(`/api/unwarp?image_key=${encodeURIComponent(currentImageKey)}`, {
+                    method: 'POST'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Unwarp failed');
+                }
+
+                const data = await response.json();
+
+                unwarpStatus.textContent = 'Unwarp complete! Refreshing...';
+                unwarpButton.style.display = 'none';
+
+                // Refresh the unwarped images after a short delay
+                setTimeout(() => {
+                    showUnwarped(currentImageKey, currentImageFilename);
+                }, 2000);
+
+            } catch (error) {
+                unwarpStatus.textContent = `Error: ${error.message}`;
+                unwarpButton.disabled = false;
+                grid.innerHTML = `<div class="empty-state" style="color: #f44336;">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function manualUnwarp() {
+            await triggerUnwarp();
+        }
+
+        function closeModal() {
+            document.getElementById('unwarpedModal').classList.remove('show');
+        }
+
+        function openFullscreen(url) {
+            event.stopPropagation();
+            document.getElementById('fullscreenImg').src = url;
+            document.getElementById('fullscreenViewer').classList.add('show');
+        }
+
+        function closeFullscreen() {
+            document.getElementById('fullscreenViewer').classList.remove('show');
+        }
+
+        // Process tab functions
+        async function loadImagesForProcessing() {
+            const date = document.getElementById('processDate').value;
+            if (!date) return;
+
+            const select = document.getElementById('processImageSelect');
+            select.innerHTML = '<option value="">Loading...</option>';
+
+            try {
+                const response = await fetch(`/api/images?date=${date}`);
+                const data = await response.json();
+
+                if (data.count === 0) {
+                    select.innerHTML = '<option value="">No images found</option>';
+                    return;
+                }
+
+                select.innerHTML = '<option value="">-- Select an image --</option>' +
+                    data.images.map(img => `
+                        <option value="${img.key}" data-url="${img.url}">${img.filename} (${img.time})</option>
+                    `).join('');
+            } catch (error) {
+                select.innerHTML = `<option value="">Error: ${error.message}</option>`;
+            }
+        }
+
+        function onProcessImageSelect() {
+            const select = document.getElementById('processImageSelect');
+            const preview = document.getElementById('processPreview');
+            const previewImg = document.getElementById('processPreviewImg');
+            const btn = document.getElementById('processBtn');
+
+            if (select.value) {
+                const option = select.options[select.selectedIndex];
+                previewImg.src = option.dataset.url;
+                preview.style.display = 'block';
+                btn.disabled = false;
+            } else {
+                preview.style.display = 'none';
+                btn.disabled = true;
+            }
+        }
+
+        async function processImage() {
+            const select = document.getElementById('processImageSelect');
+            const prompt = document.getElementById('processPrompt').value;
+            const status = document.getElementById('processStatus');
+            const btn = document.getElementById('processBtn');
+
+            if (!select.value) return;
+
+            const s3Uri = `s3://vibecast-ftp/${select.value}`;
+
+            status.className = 'processing-status loading';
+            status.innerHTML = '<div class="spinner"></div> Processing image... This may take a moment.';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/api/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        s3_uri: s3Uri,
+                        prompt: prompt || null
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    status.className = 'processing-status success';
+                    status.innerHTML = `
+                        <strong>Processing complete!</strong><br>
+                        <pre style="margin-top: 10px; white-space: pre-wrap; font-size: 12px;">${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    throw new Error(data.detail || 'Processing failed');
+                }
+            } catch (error) {
+                status.className = 'processing-status error';
+                status.textContent = `Error: ${error.message}`;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // Results tab functions
+        async function loadResults() {
+            const date = document.getElementById('resultsDate').value;
+            await fetchResults(date ? `/api/results?date=${date}` : '/api/results');
+        }
+
+        async function loadAllResults() {
+            document.getElementById('resultsDate').value = '';
+            await fetchResults('/api/results');
+        }
+
+        async function fetchResults(url) {
+            const list = document.getElementById('resultsList');
+            list.innerHTML = '<div class="empty-state"><div class="spinner"></div> Loading results...</div>';
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.count === 0) {
+                    list.innerHTML = '<div class="empty-state">No results found</div>';
+                    return;
+                }
+
+                list.innerHTML = data.results.map((result, i) => `
+                    <div class="result-card">
+                        <div class="result-header" onclick="toggleResult(${i}, '${result.key}')">
+                            <span>${result.filename}</span>
+                            <span style="color: #888; font-size: 0.9em;">${result.date || ''} - ${result.last_modified ? new Date(result.last_modified).toLocaleString() : ''}</span>
+                        </div>
+                        <div class="result-body" id="resultBody${i}"></div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                list.innerHTML = `<div class="empty-state">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function toggleResult(index, key) {
+            const body = document.getElementById(`resultBody${index}`);
+
+            if (body.classList.contains('show')) {
+                body.classList.remove('show');
+                return;
+            }
+
+            body.innerHTML = '<div class="spinner"></div> Loading...';
+            body.classList.add('show');
+
+            try {
+                const response = await fetch(`/api/result?key=${encodeURIComponent(key)}`);
+                const data = await response.json();
+
+                let html = '';
+
+                // Show input image info
+                if (data.input_uri) {
+                    html += `<p style="margin-bottom: 15px; color: #888;">Input: ${data.input_uri}</p>`;
+                }
+
+                // Show config
+                if (data.config) {
+                    html += `
+                        <div style="margin-bottom: 20px; padding: 15px; background: #16213e; border-radius: 8px;">
+                            <strong style="color: #e94560;">Config:</strong>
+                            <pre style="margin-top: 10px; color: #aaa; font-size: 12px;">${JSON.stringify(data.config, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+
+                // Show unwarped images with analysis
+                if (data.unwarped_images && data.analysis_results) {
+                    html += '<div class="result-images">';
+
+                    for (const [direction, imageData] of Object.entries(data.unwarped_images)) {
+                        const analysis = data.analysis_results[direction];
+                        const hasAnalysis = analysis && Object.keys(analysis).length > 0;
+
+                        html += `
+                            <div class="result-image-item">
+                                <div class="direction" style="padding: 10px 15px; background: #1a4a8a; font-weight: 500;">${direction}</div>
+                                ${imageData.exists && imageData.url ?
+                                    `<img src="${imageData.url}" alt="${direction}" onclick="openFullscreen('${imageData.url}')" style="cursor: zoom-in;">` :
+                                    '<div style="padding: 40px; text-align: center; color: #666;">Image not available</div>'
+                                }
+                                ${hasAnalysis ? `
+                                    <div class="analysis">
+                                        ${analysis.mood ? `
+                                            <div class="analysis-field">
+                                                <div class="label">Mood</div>
+                                                <div class="value">${analysis.mood}</div>
+                                            </div>
+                                        ` : ''}
+                                        ${typeof analysis.number_of_people !== 'undefined' ? `
+                                            <div class="analysis-field">
+                                                <div class="label">People</div>
+                                                <div class="value">${analysis.number_of_people}</div>
+                                            </div>
+                                        ` : ''}
+                                        ${analysis.description ? `
+                                            <div class="analysis-field">
+                                                <div class="label">Description</div>
+                                                <div class="value">${analysis.description}</div>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                ` : '<div style="padding: 15px; color: #666; font-style: italic;">No analysis for this view</div>'}
+                            </div>
+                        `;
+                    }
+
+                    html += '</div>';
+                }
+
+                body.innerHTML = html || '<div style="color: #888;">No detailed data available</div>';
+            } catch (error) {
+                body.innerHTML = `<div style="color: #f44336;">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+                closeFullscreen();
+            }
+        });
+
+        // Initialize
+        loadStats();
+    </script>
+</body>
+</html>
