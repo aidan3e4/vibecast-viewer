@@ -60,13 +60,21 @@ async def index(request: Request):
 # ============================================================================
 
 
+@app.get("/api/health")
+async def health_check() -> dict[str, Any]:
+    """Check API and AWS credentials health."""
+    creds_check = s3_service.check_aws_credentials()
+    return {
+        "status": "ok" if creds_check["configured"] else "degraded",
+        "aws_credentials": creds_check
+    }
+
+
 @app.get("/api/stats")
 async def get_stats() -> dict[str, Any]:
     """Get image statistics for histogram."""
-    try:
-        return s3_service.get_image_stats()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    # This now returns error info in the response instead of raising exceptions
+    return s3_service.get_image_stats()
 
 
 @app.get("/api/images")
@@ -180,7 +188,23 @@ async def unwarp_image(image_key: str) -> dict[str, Any]:
 
         return response_payload.get('body', {})
 
+    except boto3.exceptions.botocore.exceptions.NoCredentialsError:
+        raise HTTPException(
+            status_code=500,
+            detail="AWS credentials not configured. Please set up your AWS credentials to invoke Lambda functions."
+        )
+    except boto3.exceptions.botocore.exceptions.PartialCredentialsError:
+        raise HTTPException(
+            status_code=500,
+            detail="Incomplete AWS credentials. Both AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are required."
+        )
     except Exception as e:
+        error_str = str(e)
+        if "credentials" in error_str.lower():
+            raise HTTPException(
+                status_code=500,
+                detail=f"AWS credentials error: {error_str}"
+            )
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -223,7 +247,29 @@ async def get_result(key: str) -> dict[str, Any]:
 if __name__ == "__main__":
     import uvicorn
 
+    print("=" * 60)
     print("Starting Vibecast Viewer...")
+    print("=" * 60)
     print(f"Lambda API URL: {LAMBDA_API_URL}")
+    print(f"S3 Bucket: {s3_service.BUCKET_NAME}")
+    print(f"AWS Region: {s3_service.AWS_REGION}")
+    print()
+
+    # Check AWS credentials
+    creds_check = s3_service.check_aws_credentials()
+    if creds_check["configured"]:
+        print("✓ AWS credentials configured correctly")
+    else:
+        print("⚠ WARNING: AWS credentials issue detected!")
+        print(f"  {creds_check['message']}")
+        print()
+        print("  The app will start, but S3 features will not work.")
+        print("  Please configure your AWS credentials to access S3 and Lambda.")
+        print()
+
+    print("=" * 60)
     print("Open http://localhost:8001 in your browser")
+    print("=" * 60)
+    print()
+
     uvicorn.run(app, host="0.0.0.0", port=8001)

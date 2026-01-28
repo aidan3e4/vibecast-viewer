@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Any
 
 import boto3
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
 
 BUCKET_NAME = os.getenv("S3_BUCKET", "vibecast-ftp")
 AWS_REGION = os.getenv("AWS_DEFAULT_REGION", "eu-central-1")
@@ -28,6 +28,45 @@ PRESIGN_EXPIRATION = 3600
 def get_s3_client():
     """Get boto3 S3 client."""
     return boto3.client("s3", region_name=AWS_REGION)
+
+
+def check_aws_credentials() -> dict[str, Any]:
+    """Check if AWS credentials are configured properly.
+
+    Returns:
+        dict with 'configured' (bool) and 'message' (str) keys
+    """
+    try:
+        s3 = get_s3_client()
+        # Try to list buckets to verify credentials work
+        s3.list_buckets()
+        return {
+            "configured": True,
+            "message": "AWS credentials are configured correctly"
+        }
+    except NoCredentialsError:
+        return {
+            "configured": False,
+            "message": "AWS credentials not found. Please configure AWS credentials using:\n"
+                      "1. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)\n"
+                      "2. AWS credentials file (~/.aws/credentials)\n"
+                      "3. IAM role (if running on EC2/ECS)"
+        }
+    except PartialCredentialsError:
+        return {
+            "configured": False,
+            "message": "Incomplete AWS credentials. Both AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are required."
+        }
+    except ClientError as e:
+        return {
+            "configured": False,
+            "message": f"AWS credentials error: {str(e)}"
+        }
+    except Exception as e:
+        return {
+            "configured": False,
+            "message": f"Error checking AWS credentials: {str(e)}"
+        }
 
 
 def parse_image_filename(filename: str) -> dict | None:
@@ -56,43 +95,80 @@ def parse_image_filename(filename: str) -> dict | None:
 
 def get_image_stats() -> dict[str, Any]:
     """Get statistics about available images for histogram display."""
-    s3 = get_s3_client()
-    date_counts: dict[str, int] = defaultdict(int)
-    first_date = None
-    last_date = None
+    try:
+        s3 = get_s3_client()
+        date_counts: dict[str, int] = defaultdict(int)
+        first_date = None
+        last_date = None
 
-    paginator = s3.get_paginator("list_objects_v2")
+        paginator = s3.get_paginator("list_objects_v2")
 
-    for page in paginator.paginate(Bucket=BUCKET_NAME, Prefix=f"{PREFIX_FTP_UPLOADS}/"):
-        for obj in page.get("Contents", []):
-            key = obj["Key"]
-            filename = key.split("/")[-1]
+        for page in paginator.paginate(Bucket=BUCKET_NAME, Prefix=f"{PREFIX_FTP_UPLOADS}/"):
+            for obj in page.get("Contents", []):
+                key = obj["Key"]
+                filename = key.split("/")[-1]
 
-            if not filename.lower().endswith(".jpg"):
-                continue
+                if not filename.lower().endswith(".jpg"):
+                    continue
 
-            parsed = parse_image_filename(filename)
-            if not parsed:
-                continue
+                parsed = parse_image_filename(filename)
+                if not parsed:
+                    continue
 
-            date_str = parsed["date"]
-            date_counts[date_str] += 1
+                date_str = parsed["date"]
+                date_counts[date_str] += 1
 
-            if first_date is None or parsed["datetime"] < first_date:
-                first_date = parsed["datetime"]
-            if last_date is None or parsed["datetime"] > last_date:
-                last_date = parsed["datetime"]
+                if first_date is None or parsed["datetime"] < first_date:
+                    first_date = parsed["datetime"]
+                if last_date is None or parsed["datetime"] > last_date:
+                    last_date = parsed["datetime"]
 
-    sorted_dates = sorted(date_counts.items())
+        sorted_dates = sorted(date_counts.items())
 
-    return {
-        "dates": [d[0] for d in sorted_dates],
-        "counts": [d[1] for d in sorted_dates],
-        "first_date": first_date.strftime("%Y-%m-%d") if first_date else None,
-        "last_date": last_date.strftime("%Y-%m-%d") if last_date else None,
-        "total_images": sum(date_counts.values()),
-        "total_days": len(date_counts),
-    }
+        return {
+            "dates": [d[0] for d in sorted_dates],
+            "counts": [d[1] for d in sorted_dates],
+            "first_date": first_date.strftime("%Y-%m-%d") if first_date else None,
+            "last_date": last_date.strftime("%Y-%m-%d") if last_date else None,
+            "total_images": sum(date_counts.values()),
+            "total_days": len(date_counts),
+        }
+    except (NoCredentialsError, PartialCredentialsError) as e:
+        # Return empty stats with error flag for credential issues
+        return {
+            "dates": [],
+            "counts": [],
+            "first_date": None,
+            "last_date": None,
+            "total_images": 0,
+            "total_days": 0,
+            "error": "credentials",
+            "error_message": "AWS credentials not configured. Please set up your AWS credentials to access S3."
+        }
+    except ClientError as e:
+        error_code = e.response.get('Error', {}).get('Code', 'Unknown')
+        if error_code == 'NoSuchBucket':
+            return {
+                "dates": [],
+                "counts": [],
+                "first_date": None,
+                "last_date": None,
+                "total_images": 0,
+                "total_days": 0,
+                "error": "bucket",
+                "error_message": f"S3 bucket '{BUCKET_NAME}' not found. Please check your configuration."
+            }
+        else:
+            return {
+                "dates": [],
+                "counts": [],
+                "first_date": None,
+                "last_date": None,
+                "total_images": 0,
+                "total_days": 0,
+                "error": "s3",
+                "error_message": f"S3 error: {str(e)}"
+            }
 
 
 def list_images_by_date(date: str) -> list[dict]:
