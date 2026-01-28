@@ -42,7 +42,7 @@ COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
-COPY pyproject.toml constants.py Makefile ./
+COPY pyproject.toml ./
 
 # Copy entrypoint script
 COPY entrypoint.sh ./
