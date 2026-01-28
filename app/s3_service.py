@@ -133,7 +133,7 @@ def get_image_stats() -> dict[str, Any]:
             "total_images": sum(date_counts.values()),
             "total_days": len(date_counts),
         }
-    except (NoCredentialsError, PartialCredentialsError) as e:
+    except (NoCredentialsError, PartialCredentialsError):
         # Return empty stats with error flag for credential issues
         return {
             "dates": [],
