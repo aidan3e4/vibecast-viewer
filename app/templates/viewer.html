@@ -281,6 +281,46 @@
 
         .modal-header h3 {
             color: #e94560;
+            flex: 1;
+        }
+
+        .modal-nav {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-right: 20px;
+        }
+
+        .image-counter {
+            color: #888;
+            font-size: 0.85em;
+            margin: 0 10px;
+            white-space: nowrap;
+        }
+
+        .nav-arrow {
+            background: #0f3460;
+            border: 1px solid #1a4a8a;
+            color: #ddd;
+            width: 36px;
+            height: 36px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .nav-arrow:hover:not(:disabled) {
+            background: #1a4a8a;
+            color: #e94560;
+        }
+
+        .nav-arrow:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
         }
 
         .modal-close {
@@ -303,8 +343,20 @@
         /* Unwarped grid */
         .unwarped-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(3, 1fr);
             gap: 20px;
+        }
+
+        @media (max-width: 1200px) {
+            .unwarped-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .unwarped-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         .unwarped-item {
@@ -317,11 +369,21 @@
             opacity: 0.5;
         }
 
+        .unwarped-item.fisheye {
+            background: #1a2e4a;
+            border: 2px solid #e94560;
+        }
+
         .unwarped-item .direction {
             padding: 10px 15px;
             background: #1a4a8a;
             font-weight: 500;
             text-transform: capitalize;
+        }
+
+        .unwarped-item.fisheye .direction {
+            background: #e94560;
+            color: white;
         }
 
         .unwarped-item img {
@@ -848,6 +910,11 @@
     <div class="modal-overlay" id="unwarpedModal">
         <div class="modal-content">
             <div class="modal-header">
+                <div class="modal-nav">
+                    <button class="nav-arrow" id="prevImageBtn" onclick="navigateImage(-1)" title="Previous image (Left Arrow)">&#9664;</button>
+                    <span class="image-counter" id="imageCounter"></span>
+                    <button class="nav-arrow" id="nextImageBtn" onclick="navigateImage(1)" title="Next image (Right Arrow)">&#9654;</button>
+                </div>
                 <h3 id="modalTitle">Unwarped Views</h3>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <button class="btn btn-primary" id="unwarpButton" onclick="manualUnwarp()" style="display: none;">
@@ -874,6 +941,7 @@
         let currentImages = [];
         let currentImageKey = null;
         let currentImageFilename = null;
+        let currentImageIndex = -1;
 
         // Tab switching
         document.querySelectorAll('.tab').forEach(tab => {
@@ -1141,8 +1209,8 @@
                     return;
                 }
 
-                grid.innerHTML = data.images.map(img => `
-                    <div class="image-card" onclick="showUnwarped('${img.key}', '${img.filename}')">
+                grid.innerHTML = data.images.map((img, index) => `
+                    <div class="image-card" onclick="showUnwarped('${img.key}', '${img.filename}', ${index})">
                         <img src="${img.url}" alt="${img.filename}" loading="lazy">
                         <div class="info">
                             <div class="filename">${img.filename}</div>
@@ -1155,7 +1223,7 @@
             }
         }
 
-        async function showUnwarped(imageKey, filename) {
+        async function showUnwarped(imageKey, filename, index = -1) {
             const modal = document.getElementById('unwarpedModal');
             const grid = document.getElementById('unwarpedGrid');
             const title = document.getElementById('modalTitle');
@@ -1165,6 +1233,10 @@
             // Store current image info globally
             currentImageKey = imageKey;
             currentImageFilename = filename;
+            currentImageIndex = index;
+
+            // Update navigation buttons
+            updateNavigationButtons();
 
             title.textContent = filename;
             grid.innerHTML = '<div class="empty-state"><div class="spinner"></div> Loading unwarped images...</div>';
@@ -1186,13 +1258,33 @@
                     unwarpButton.style.display = 'block';
                 }
 
-                grid.innerHTML = directions.map(dir => {
+                // Get the fisheye image URL from currentImages
+                let fisheyeUrl = '';
+                if (currentImageIndex >= 0 && currentImageIndex < currentImages.length) {
+                    fisheyeUrl = currentImages[currentImageIndex].url;
+                }
+
+                // Build grid with fisheye first, then unwarped images
+                let gridHTML = '';
+
+                // Add fisheye image
+                if (fisheyeUrl) {
+                    gridHTML += `
+                        <div class="unwarped-item fisheye">
+                            <div class="direction">Original Fisheye</div>
+                            <img src="${fisheyeUrl}" alt="Original Fisheye" onclick="openFullscreen('${fisheyeUrl}')" style="cursor: zoom-in;">
+                        </div>
+                    `;
+                }
+
+                // Add unwarped images
+                gridHTML += directions.map(dir => {
                     const item = data.unwarped[dir];
                     if (item && item.exists) {
                         return `
                             <div class="unwarped-item">
                                 <div class="direction">${item.direction}</div>
-                                <img src="${item.url}" alt="${item.direction}" onclick="openFullscreen('${item.url}')">
+                                <img src="${item.url}" alt="${item.direction}" onclick="openFullscreen('${item.url}')" style="cursor: zoom-in;">
                             </div>
                         `;
                     } else {
@@ -1205,6 +1297,8 @@
                     }
                 }).join('');
 
+                grid.innerHTML = gridHTML;
+
                 // Check if auto-unwarp is enabled
                 const autoUnwarp = document.getElementById('autoUnwarpCheckbox').checked;
                 if (autoUnwarp && !anyExist) {
@@ -1214,6 +1308,32 @@
             } catch (error) {
                 grid.innerHTML = `<div class="empty-state">Error: ${error.message}</div>`;
             }
+        }
+
+        function updateNavigationButtons() {
+            const prevBtn = document.getElementById('prevImageBtn');
+            const nextBtn = document.getElementById('nextImageBtn');
+            const counter = document.getElementById('imageCounter');
+
+            if (currentImageIndex < 0 || currentImages.length === 0) {
+                prevBtn.disabled = true;
+                nextBtn.disabled = true;
+                counter.textContent = '';
+            } else {
+                prevBtn.disabled = currentImageIndex <= 0;
+                nextBtn.disabled = currentImageIndex >= currentImages.length - 1;
+                counter.textContent = `${currentImageIndex + 1} / ${currentImages.length}`;
+            }
+        }
+
+        function navigateImage(direction) {
+            if (currentImages.length === 0 || currentImageIndex < 0) return;
+
+            const newIndex = currentImageIndex + direction;
+            if (newIndex < 0 || newIndex >= currentImages.length) return;
+
+            const img = currentImages[newIndex];
+            showUnwarped(img.key, img.filename, newIndex);
         }
 
         async function triggerUnwarp() {
@@ -1244,7 +1364,7 @@
 
                 // Refresh the unwarped images after a short delay
                 setTimeout(() => {
-                    showUnwarped(currentImageKey, currentImageFilename);
+                    showUnwarped(currentImageKey, currentImageFilename, currentImageIndex);
                 }, 2000);
 
             } catch (error) {
@@ -1260,6 +1380,7 @@
 
         function closeModal() {
             document.getElementById('unwarpedModal').classList.remove('show');
+            // Don't reset currentImageIndex so we can reopen at the same position if needed
         }
 
         function openFullscreen(url) {
@@ -1483,6 +1604,18 @@
             if (e.key === 'Escape') {
                 closeModal();
                 closeFullscreen();
+            }
+
+            // Navigation with arrow keys when modal is open
+            const modal = document.getElementById('unwarpedModal');
+            const fullscreen = document.getElementById('fullscreenViewer');
+
+            if (modal.classList.contains('show') && !fullscreen.classList.contains('show')) {
+                if (e.key === 'ArrowLeft') {
+                    navigateImage(-1);
+                } else if (e.key === 'ArrowRight') {
+                    navigateImage(1);
+                }
             }
         });
 
