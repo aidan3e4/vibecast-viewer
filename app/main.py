@@ -34,7 +34,10 @@ LAMBDA_API_URL = os.getenv(
 
 class ProcessRequest(BaseModel):
     s3_uri: str
+    unwarp: bool = True  # Perform fisheye unwarping
+    analyze: bool = True  # Perform LLM analysis
     prompt: str | None = None
+    views_to_analyze: list[str] | None = None  # e.g., ["N", "S", "E", "W", "B"] - only for unwarp+analyze
 
 
 # ============================================================================
@@ -132,9 +135,16 @@ async def process_image(req: ProcessRequest) -> dict[str, Any]:
     """Process an image via Lambda."""
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
-            payload = {"s3_uri": req.s3_uri}
+            payload = {
+                "input_s3_uri": req.s3_uri,
+                "unwarp": req.unwarp,
+                "analyze": req.analyze,
+            }
             if req.prompt:
                 payload["prompt"] = req.prompt
+            # Only include views_to_analyze for unwarp+analyze mode
+            if req.unwarp and req.analyze:
+                payload["views_to_analyze"] = req.views_to_analyze or ["N", "S", "E", "W", "B"]
 
             response = await client.post(LAMBDA_API_URL, json=payload)
 
@@ -166,7 +176,9 @@ async def unwarp_image(image_key: str) -> dict[str, Any]:
         lambda_client = boto3.client('lambda', region_name=s3_service.AWS_REGION)
 
         payload = {
-            "input_s3_uri": s3_uri
+            "input_s3_uri": s3_uri,
+            "unwarp": True,
+            "analyze": False,
         }
 
         response = lambda_client.invoke(
@@ -178,15 +190,20 @@ async def unwarp_image(image_key: str) -> dict[str, Any]:
         # Parse response
         response_payload = json.loads(response['Payload'].read())
 
+        # Parse body if it's a JSON string (Lambda returns stringified JSON for API Gateway compatibility)
+        body = response_payload.get('body', {})
+        if isinstance(body, str):
+            body = json.loads(body)
+
         # Check for errors in the response
         if response_payload.get('statusCode') != 200:
-            error_msg = response_payload.get('body', {}).get('error', 'Unknown error')
+            error_msg = body.get('error', 'Unknown error')
             raise HTTPException(
                 status_code=response_payload.get('statusCode', 500),
                 detail=f"Lambda error: {error_msg}"
             )
 
-        return response_payload.get('body', {})
+        return body
 
     except boto3.exceptions.botocore.exceptions.NoCredentialsError:
         raise HTTPException(

@@ -2096,13 +2096,19 @@
                         // If we have an s3Key, use it; otherwise construct from imageKey
                         const s3Uri = img.s3Key ? `s3://vibecast-ftp/${img.s3Key}` : `s3://vibecast-ftp/${img.imageKey}`;
 
+                        // Map direction label to short code
+                        const directionMap = {
+                            'north': 'N', 'south': 'S', 'east': 'E', 'west': 'W', 'below': 'B', 'bottom': 'B'
+                        };
+                        const viewCode = directionMap[img.label.toLowerCase()];
+
                         const response = await fetch('/api/process', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 s3_uri: s3Uri,
                                 prompt: prompt || null,
-                                direction: img.label
+                                views_to_analyze: viewCode ? [viewCode] : null
                             })
                         });
 
