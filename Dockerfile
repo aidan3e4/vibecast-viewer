@@ -43,6 +43,7 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
 COPY pyproject.toml ./
+COPY app/ ./app/
 
 # Copy entrypoint script
 COPY entrypoint.sh ./

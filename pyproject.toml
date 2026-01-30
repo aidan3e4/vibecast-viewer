@@ -1,5 +1,5 @@
 [project]
-name = "vibecast"
+name = "vibecast-viewer"
 version = "0.0.1"
 description = "Vibecast"
 readme = "README.md"
