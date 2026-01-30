@@ -97,6 +97,92 @@ async def get_models() -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _parse_lambda_response(data: dict) -> dict:
+    """Parse Lambda response, handling JSON string body."""
+    if "body" in data and isinstance(data["body"], str):
+        return json.loads(data["body"])
+    return data
+
+
+@app.get("/api/prompts")
+async def list_prompts(all: bool = False) -> dict[str, Any]:
+    """List all prompts (names only, or all versions if all=true)."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            url = f"{LAMBDA_API_BASE}/prompts"
+            if all:
+                url += "?all=true"
+            response = await client.get(url)
+            if response.status_code != 200:
+                raise HTTPException(response.status_code, f"Failed to fetch prompts: {response.text}")
+            return _parse_lambda_response(response.json())
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Timeout fetching prompts")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/prompts/{name}")
+async def get_prompt(name: str) -> dict[str, Any]:
+    """Get latest version of a prompt."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{LAMBDA_API_BASE}/prompts/{name}")
+            if response.status_code != 200:
+                raise HTTPException(response.status_code, f"Prompt not found: {response.text}")
+            return _parse_lambda_response(response.json())
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Timeout fetching prompt")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/prompts/{name}/{version}")
+async def get_prompt_version(name: str, version: int) -> dict[str, Any]:
+    """Get specific version of a prompt."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{LAMBDA_API_BASE}/prompts/{name}/{version}")
+            if response.status_code != 200:
+                raise HTTPException(response.status_code, f"Prompt version not found: {response.text}")
+            return _parse_lambda_response(response.json())
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Timeout fetching prompt")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class PromptCreate(BaseModel):
+    name: str
+    content: str
+
+
+@app.post("/api/prompts")
+async def save_prompt(req: PromptCreate) -> dict[str, Any]:
+    """Create new prompt or push new version."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                f"{LAMBDA_API_BASE}/prompts",
+                json={"name": req.name, "content": req.content}
+            )
+            if response.status_code not in (200, 201):
+                raise HTTPException(response.status_code, f"Failed to save prompt: {response.text}")
+            return _parse_lambda_response(response.json())
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Timeout saving prompt")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/stats")
 async def get_stats() -> dict[str, Any]:
     """Get image statistics for histogram."""

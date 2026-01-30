@@ -1063,8 +1063,24 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="processPrompt">Analysis Prompt (optional)</label>
+                    <label>Prompt Template</label>
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <select id="promptName" style="flex: 2;" onchange="onPromptNameChange()">
+                            <option value="">Loading prompts...</option>
+                        </select>
+                        <select id="promptVersion" style="flex: 1;" onchange="onPromptVersionChange()">
+                            <option value="">-</option>
+                        </select>
+                    </div>
+                    <div id="newPromptRow" style="display: none; margin-bottom: 10px;">
+                        <input type="text" id="newPromptName" placeholder="Enter new prompt name..." style="width: 100%; padding: 8px; background: #0f3460; border: 1px solid #1a4a8a; border-radius: 4px; color: #fff;">
+                    </div>
                     <textarea id="processPrompt" rows="4" placeholder="Enter a custom prompt for the analysis..."></textarea>
+                    <div style="margin-top: 10px; text-align: right;">
+                        <button class="btn btn-secondary" id="savePromptBtn" onclick="savePrompt()" style="padding: 8px 16px;">
+                            Push new version
+                        </button>
+                    </div>
                 </div>
 
                 <button class="btn btn-primary" id="processBtn" onclick="processSelectedImages()" disabled>
@@ -2804,9 +2820,159 @@
             }
         }
 
+        // Prompt management
+        let allPrompts = []; // Store all prompts with versions
+
+        async function loadPrompts() {
+            const nameSelect = document.getElementById('promptName');
+            const versionSelect = document.getElementById('promptVersion');
+            try {
+                const response = await fetch('/api/prompts?all=true');
+                if (!response.ok) throw new Error('Failed to load prompts');
+                const data = await response.json();
+                allPrompts = data.prompts || [];
+
+                // Get unique prompt names
+                const names = [...new Set(allPrompts.map(p => p.name))];
+
+                nameSelect.innerHTML = '<option value="__new__">+ Create new prompt</option>';
+                names.forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    if (name === 'default') option.selected = true;
+                    nameSelect.appendChild(option);
+                });
+
+                // Load versions for selected name
+                onPromptNameChange();
+            } catch (error) {
+                console.error('Error loading prompts:', error);
+                nameSelect.innerHTML = '<option value="__new__">+ Create new prompt</option>';
+                versionSelect.innerHTML = '<option value="">-</option>';
+                updateSaveButton();
+            }
+        }
+
+        function onPromptNameChange() {
+            const nameSelect = document.getElementById('promptName');
+            const versionSelect = document.getElementById('promptVersion');
+            const newPromptRow = document.getElementById('newPromptRow');
+            const name = nameSelect.value;
+
+            // Show/hide new prompt name input
+            if (name === '__new__') {
+                newPromptRow.style.display = 'block';
+                versionSelect.innerHTML = '<option value="">-</option>';
+                document.getElementById('processPrompt').value = '';
+                document.getElementById('newPromptName').value = '';
+                updateSaveButton();
+                return;
+            } else {
+                newPromptRow.style.display = 'none';
+            }
+
+            // Get versions for this name
+            const versions = allPrompts
+                .filter(p => p.name === name)
+                .map(p => p.version)
+                .sort((a, b) => b - a); // Descending (latest first)
+
+            versionSelect.innerHTML = '';
+            versions.forEach((v, i) => {
+                const option = document.createElement('option');
+                option.value = v;
+                option.textContent = `v${v}${i === 0 ? ' (latest)' : ''}`;
+                versionSelect.appendChild(option);
+            });
+
+            // Load the latest version content
+            onPromptVersionChange();
+            updateSaveButton();
+        }
+
+        async function onPromptVersionChange() {
+            const name = document.getElementById('promptName').value;
+            const version = document.getElementById('promptVersion').value;
+            const textarea = document.getElementById('processPrompt');
+
+            if (!name || name === '__new__' || version === '') return;
+
+            try {
+                const response = await fetch(`/api/prompts/${name}/${version}`);
+                if (!response.ok) throw new Error('Failed to load prompt');
+                const data = await response.json();
+                textarea.value = data.content || '';
+            } catch (error) {
+                console.error('Error loading prompt version:', error);
+            }
+        }
+
+        function updateSaveButton() {
+            const nameSelect = document.getElementById('promptName');
+            const btn = document.getElementById('savePromptBtn');
+            const name = nameSelect.value;
+
+            if (name === '__new__') {
+                btn.textContent = 'Create v0';
+            } else {
+                // Find next version number
+                const versions = allPrompts
+                    .filter(p => p.name === name)
+                    .map(p => p.version);
+                const nextVersion = versions.length > 0 ? Math.max(...versions) + 1 : 0;
+                btn.textContent = `Push v${nextVersion}`;
+            }
+        }
+
+        async function savePrompt() {
+            const nameSelect = document.getElementById('promptName');
+            const content = document.getElementById('processPrompt').value.trim();
+
+            if (!content) {
+                alert('Prompt content cannot be empty');
+                return;
+            }
+
+            let promptName;
+            if (nameSelect.value === '__new__') {
+                promptName = document.getElementById('newPromptName').value.trim();
+                if (!promptName) {
+                    alert('Please enter a name for the new prompt');
+                    document.getElementById('newPromptName').focus();
+                    return;
+                }
+            } else {
+                promptName = nameSelect.value;
+            }
+
+            try {
+                const response = await fetch('/api/prompts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: promptName, content })
+                });
+
+                if (!response.ok) throw new Error('Failed to save prompt');
+                const data = await response.json();
+
+                alert(`Prompt ${data.action}: ${data.name} v${data.version}`);
+
+                // Reload prompts and select the saved one
+                await loadPrompts();
+                document.getElementById('promptName').value = data.name;
+                onPromptNameChange();
+                document.getElementById('promptVersion').value = data.version;
+            } catch (error) {
+                console.error('Error saving prompt:', error);
+                alert('Failed to save prompt: ' + error.message);
+            }
+        }
+
         // Initialize
         loadStats();
         loadModels();
+        loadPrompts();
     </script>
 </body>
 </html>
