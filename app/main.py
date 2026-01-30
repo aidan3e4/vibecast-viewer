@@ -30,6 +30,7 @@ LAMBDA_API_URL = os.getenv(
     "LAMBDA_API_URL",
     "https://ck8k8vbs36.execute-api.eu-central-1.amazonaws.com/process",
 )
+LAMBDA_API_BASE = LAMBDA_API_URL.rsplit("/", 1)[0]  # Base URL without /process
 
 
 class ProcessRequest(BaseModel):
@@ -38,6 +39,7 @@ class ProcessRequest(BaseModel):
     analyze: bool = True  # Perform LLM analysis
     prompt: str | None = None
     views_to_analyze: list[str] | None = None  # e.g., ["N", "S", "E", "W", "B"] - only for unwarp+analyze
+    model: str | None = None  # LLM model to use for analysis
 
 
 # ============================================================================
@@ -71,6 +73,28 @@ async def health_check() -> dict[str, Any]:
         "status": "ok" if creds_check["configured"] else "degraded",
         "aws_credentials": creds_check
     }
+
+
+@app.get("/api/models")
+async def get_models() -> dict[str, Any]:
+    """Get available models from Lambda API."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{LAMBDA_API_BASE}/models")
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"Failed to fetch models: {response.text}",
+                )
+            data = response.json()
+            # Handle case where body is JSON string (Lambda response format)
+            if "body" in data and isinstance(data["body"], str):
+                return json.loads(data["body"])
+            return data
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Timeout fetching models")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/stats")
@@ -142,6 +166,8 @@ async def process_image(req: ProcessRequest) -> dict[str, Any]:
             }
             if req.prompt:
                 payload["prompt"] = req.prompt
+            if req.model:
+                payload["model"] = req.model
             # Only include views_to_analyze for unwarp+analyze mode
             if req.unwarp and req.analyze:
                 payload["views_to_analyze"] = req.views_to_analyze or ["N", "S", "E", "W", "B"]

@@ -1047,7 +1047,7 @@ wheels = [
 ]
 
 [[package]]
-name = "vibecast"
+name = "vibecast-viewer"
 version = "0.0.1"
 source = { virtual = "." }
 dependencies = [

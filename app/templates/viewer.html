@@ -1056,6 +1056,13 @@
 
             <div class="process-form" style="max-width: 100%;">
                 <div class="form-group">
+                    <label for="processModel">Model</label>
+                    <select id="processModel">
+                        <option value="">Loading models...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
                     <label for="processPrompt">Analysis Prompt (optional)</label>
                     <textarea id="processPrompt" rows="4" placeholder="Enter a custom prompt for the analysis..."></textarea>
                 </div>
@@ -2071,6 +2078,7 @@
 
         async function processSelectedImages() {
             const prompt = document.getElementById('processPrompt').value;
+            const model = document.getElementById('processModel').value;
             const status = document.getElementById('processStatus');
             const btn = document.getElementById('processBtn');
 
@@ -2108,6 +2116,7 @@
                             body: JSON.stringify({
                                 s3_uri: s3Uri,
                                 prompt: prompt || null,
+                                model: model || null,
                                 views_to_analyze: viewCode ? [viewCode] : null
                             })
                         });
@@ -2771,8 +2780,33 @@
             }
         });
 
+        // Load available models for dropdown
+        async function loadModels() {
+            const select = document.getElementById('processModel');
+            try {
+                const response = await fetch('/api/models');
+                if (!response.ok) throw new Error('Failed to load models');
+                const data = await response.json();
+
+                select.innerHTML = '';
+                data.models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model.id;
+                    option.textContent = `${model.id} - ${model.description || ''}`;
+                    if (model.id === data.default) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading models:', error);
+                select.innerHTML = '<option value="">Failed to load models</option>';
+            }
+        }
+
         // Initialize
         loadStats();
+        loadModels();
     </script>
 </body>
 </html>
