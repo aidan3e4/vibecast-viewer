@@ -2617,6 +2617,19 @@
                     html += '</div>';
                 }
 
+                // Show analysis_results if present
+                if (data.analysis_results && Object.keys(data.analysis_results).length > 0) {
+                    const analysisJson = JSON.stringify(data.analysis_results, null, 2);
+                    const isLongAnalysis = analysisJson.length > 500;
+                    html += `
+                        <div style="margin-bottom: 20px; padding: 15px; background: #16213e; border-radius: 8px; overflow: hidden;">
+                            <strong style="color: #e94560;">Analysis Results:</strong>
+                            <pre id="analysisBox${index}" style="margin-top: 10px; max-height: ${isLongAnalysis ? '200px' : 'none'}; overflow-y: ${isLongAnalysis ? 'auto' : 'visible'}; overflow-x: auto; color: #aaa; font-size: 12px; white-space: pre-wrap; border: ${isLongAnalysis ? '1px solid #1a4a8a' : 'none'}; padding: ${isLongAnalysis ? '8px' : '0'}; border-radius: 4px; max-width: 100%;">${analysisJson}</pre>
+                            ${isLongAnalysis ? `<button onclick="toggleAnalysisExpand(${index})" style="margin-top: 10px; padding: 5px 10px; background: #1a4a8a; color: #ddd; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;">Expand/Collapse</button>` : ''}
+                        </div>
+                    `;
+                }
+
                 // Button to toggle showing all images
                 const showAllBtnId = `showAllBtn${index}`;
                 html += `
@@ -2747,6 +2760,17 @@
                 promptBox.style.maxHeight = '150px';
             } else {
                 promptBox.style.maxHeight = 'none';
+            }
+        }
+
+        function toggleAnalysisExpand(index) {
+            const analysisBox = document.getElementById(`analysisBox${index}`);
+            if (!analysisBox) return;
+
+            if (analysisBox.style.maxHeight === 'none') {
+                analysisBox.style.maxHeight = '200px';
+            } else {
+                analysisBox.style.maxHeight = 'none';
             }
         }
 
