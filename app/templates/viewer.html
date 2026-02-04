@@ -1146,15 +1146,25 @@
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
                 <!-- Processed Date Filter -->
                 <div style="background: #0f3460; border-radius: 8px; padding: 15px;">
-                    <h4 style="color: #4CAF50; margin-bottom: 12px; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px;">Filter by Result Generated Date</h4>
+                    <h4 style="color: #4CAF50; margin-bottom: 12px; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px;">Filter by Result Generated Date & Time</h4>
                     <div class="date-time-inputs" style="display: flex; gap: 10px; margin-bottom: 10px;">
                         <div class="form-group" style="flex: 1;">
-                            <label style="font-size: 0.85em;">From</label>
+                            <label style="font-size: 0.85em;">From Date</label>
                             <input type="date" id="processedFromDate" onchange="updateProcessedDateFilter()">
                         </div>
                         <div class="form-group" style="flex: 1;">
-                            <label style="font-size: 0.85em;">To</label>
+                            <label style="font-size: 0.85em;">From Time</label>
+                            <input type="time" id="processedFromTime" onchange="updateProcessedDateFilter()" step="1">
+                        </div>
+                    </div>
+                    <div class="date-time-inputs" style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <div class="form-group" style="flex: 1;">
+                            <label style="font-size: 0.85em;">To Date</label>
                             <input type="date" id="processedToDate" onchange="updateProcessedDateFilter()">
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label style="font-size: 0.85em;">To Time</label>
+                            <input type="time" id="processedToTime" onchange="updateProcessedDateFilter()" step="1">
                         </div>
                     </div>
                     <button class="btn btn-secondary" onclick="clearProcessedDateFilter()" style="padding: 6px 12px; font-size: 0.85em; width: 100%;">Clear Filter</button>
@@ -1162,15 +1172,25 @@
 
                 <!-- Capture Date Filter -->
                 <div style="background: #0f3460; border-radius: 8px; padding: 15px;">
-                    <h4 style="color: #e94560; margin-bottom: 12px; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px;">Filter by Image Capture Date</h4>
+                    <h4 style="color: #e94560; margin-bottom: 12px; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px;">Filter by Image Capture Date & Time</h4>
                     <div class="date-time-inputs" style="display: flex; gap: 10px; margin-bottom: 10px;">
                         <div class="form-group" style="flex: 1;">
-                            <label style="font-size: 0.85em;">From</label>
+                            <label style="font-size: 0.85em;">From Date</label>
                             <input type="date" id="captureFromDate" onchange="updateCaptureDateFilter()">
                         </div>
                         <div class="form-group" style="flex: 1;">
-                            <label style="font-size: 0.85em;">To</label>
+                            <label style="font-size: 0.85em;">From Time</label>
+                            <input type="time" id="captureFromTime" onchange="updateCaptureDateFilter()" step="1">
+                        </div>
+                    </div>
+                    <div class="date-time-inputs" style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <div class="form-group" style="flex: 1;">
+                            <label style="font-size: 0.85em;">To Date</label>
                             <input type="date" id="captureToDate" onchange="updateCaptureDateFilter()">
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label style="font-size: 0.85em;">To Time</label>
+                            <input type="time" id="captureToTime" onchange="updateCaptureDateFilter()" step="1">
                         </div>
                     </div>
                     <button class="btn btn-secondary" onclick="clearCaptureDateFilter()" style="padding: 6px 12px; font-size: 0.85em; width: 100%;">Clear Filter</button>
@@ -2107,6 +2127,13 @@
             status.innerHTML = '<div class="spinner"></div> Processing selected images... This may take a while.';
             btn.disabled = true;
 
+            // Track processing start time for filtering results later (in UTC to match backend)
+            // Subtract 5 seconds as buffer to catch any results that might be slightly earlier
+            const processingStartTime = new Date(Date.now() - 5000); // -5 seconds
+            const processingStartISO = processingStartTime.toISOString(); // UTC time
+            const processingStartDate = processingStartISO.split('T')[0];
+            const processingStartTimeStr = processingStartISO.split('T')[1].split('.')[0]; // HH:MM:SS in UTC
+
             try {
                 // Process each selected image
                 let results = [];
@@ -2150,10 +2177,20 @@
                 }
 
                 // Show results
+                // Track processing end time (in UTC to match backend)
+                // Add 5 seconds as buffer to catch any results that might be slightly later
+                const processingEndTime = new Date(Date.now() + 5000); // +5 seconds
+                const processingEndISO = processingEndTime.toISOString(); // UTC time
+                const processingEndDate = processingEndISO.split('T')[0];
+                const processingEndTimeStr = processingEndISO.split('T')[1].split('.')[0]; // HH:MM:SS in UTC
+
                 if (errors.length === 0) {
                     status.className = 'processing-status success';
                     status.innerHTML = `
                         <strong>All ${results.length} images processed successfully!</strong><br>
+                        <button onclick="viewResultsInExplorer('${processingStartDate}', '${processingStartTimeStr}', '${processingEndDate}', '${processingEndTimeStr}')" class="btn btn-primary" style="margin-top: 10px; padding: 8px 16px;">
+                            See results in Result Explorer
+                        </button>
                         <div style="margin-top: 10px; max-height: 300px; overflow-y: auto;">
                             ${results.map(r => `
                                 <div style="margin: 10px 0; padding: 10px; background: rgba(76, 175, 80, 0.1); border-radius: 4px;">
@@ -2180,6 +2217,9 @@
                     status.className = 'processing-status success';
                     status.innerHTML = `
                         <strong>Processed ${results.length} successfully, ${errors.length} failed</strong><br>
+                        <button onclick="viewResultsInExplorer('${processingStartDate}', '${processingStartTimeStr}', '${processingEndDate}', '${processingEndTimeStr}')" class="btn btn-primary" style="margin-top: 10px; padding: 8px 16px;">
+                            See results in Result Explorer
+                        </button>
                         <div style="margin-top: 10px; max-height: 300px; overflow-y: auto;">
                             ${results.map(r => `
                                 <div style="margin: 10px 0; padding: 10px; background: rgba(76, 175, 80, 0.1); border-radius: 4px;">
@@ -2207,8 +2247,8 @@
         let resultsGeneratedChart = null;
         let imagesAnalyzedChart = null;
         let resultsStatsData = null;
-        let processedDateFilter = { from: null, to: null }; // Filter for when result was generated
-        let captureDateFilter = { from: null, to: null };   // Filter for when image was captured
+        let processedDateFilter = { fromDate: null, fromTime: null, toDate: null, toTime: null }; // Filter for when result was generated
+        let captureDateFilter = { fromDate: null, fromTime: null, toDate: null, toTime: null };   // Filter for when image was captured
 
         async function loadResultStats() {
             try {
@@ -2344,95 +2384,123 @@
 
         function setProcessedDateFilter(date) {
             // Set both from and to to the same date (single date selection from histogram)
-            processedDateFilter = { from: date, to: date };
+            processedDateFilter = { fromDate: date, fromTime: null, toDate: date, toTime: null };
             document.getElementById('processedFromDate').value = date;
+            document.getElementById('processedFromTime').value = '';
             document.getElementById('processedToDate').value = date;
+            document.getElementById('processedToTime').value = '';
             updateProcessedDateFilterDisplay();
             loadResultsWithFilters();
         }
 
         function setCaptureDateFilter(date) {
             // Set both from and to to the same date (single date selection from histogram)
-            captureDateFilter = { from: date, to: date };
+            captureDateFilter = { fromDate: date, fromTime: null, toDate: date, toTime: null };
             document.getElementById('captureFromDate').value = date;
+            document.getElementById('captureFromTime').value = '';
             document.getElementById('captureToDate').value = date;
+            document.getElementById('captureToTime').value = '';
             updateCaptureDateFilterDisplay();
             loadResultsWithFilters();
         }
 
         function updateProcessedDateFilter() {
-            const from = document.getElementById('processedFromDate').value;
-            const to = document.getElementById('processedToDate').value;
-            processedDateFilter = { from, to };
+            const fromDate = document.getElementById('processedFromDate').value;
+            const fromTime = document.getElementById('processedFromTime').value;
+            const toDate = document.getElementById('processedToDate').value;
+            const toTime = document.getElementById('processedToTime').value;
+            processedDateFilter = { fromDate, fromTime, toDate, toTime };
             updateProcessedDateFilterDisplay();
         }
 
         function updateCaptureDateFilter() {
-            const from = document.getElementById('captureFromDate').value;
-            const to = document.getElementById('captureToDate').value;
-            captureDateFilter = { from, to };
+            const fromDate = document.getElementById('captureFromDate').value;
+            const fromTime = document.getElementById('captureFromTime').value;
+            const toDate = document.getElementById('captureToDate').value;
+            const toTime = document.getElementById('captureToTime').value;
+            captureDateFilter = { fromDate, fromTime, toDate, toTime };
             updateCaptureDateFilterDisplay();
         }
 
         function updateProcessedDateFilterDisplay() {
-            const { from, to } = processedDateFilter;
-            if (from || to) {
+            const { fromDate, fromTime, toDate, toTime } = processedDateFilter;
+            if (fromDate || toDate) {
                 document.getElementById('processedDateFilter').style.display = 'flex';
-                if (from && to && from === to) {
-                    document.getElementById('processedDateFilterValue').textContent = from;
-                } else if (from && to) {
-                    document.getElementById('processedDateFilterValue').textContent = `${from} to ${to}`;
-                } else if (from) {
-                    document.getElementById('processedDateFilterValue').textContent = `from ${from}`;
-                } else if (to) {
-                    document.getElementById('processedDateFilterValue').textContent = `to ${to}`;
+                let text = '';
+                if (fromDate && toDate && fromDate === toDate && !fromTime && !toTime) {
+                    text = fromDate;
+                } else {
+                    const fromStr = fromDate + (fromTime ? ` ${fromTime}` : '');
+                    const toStr = toDate + (toTime ? ` ${toTime}` : '');
+                    if (fromDate && toDate) {
+                        text = `${fromStr} to ${toStr}`;
+                    } else if (fromDate) {
+                        text = `from ${fromStr}`;
+                    } else if (toDate) {
+                        text = `to ${toStr}`;
+                    }
                 }
+                document.getElementById('processedDateFilterValue').textContent = text;
             } else {
                 document.getElementById('processedDateFilter').style.display = 'none';
             }
         }
 
         function updateCaptureDateFilterDisplay() {
-            const { from, to } = captureDateFilter;
-            if (from || to) {
+            const { fromDate, fromTime, toDate, toTime } = captureDateFilter;
+            if (fromDate || toDate) {
                 document.getElementById('captureDateFilter').style.display = 'flex';
-                if (from && to && from === to) {
-                    document.getElementById('captureDateFilterValue').textContent = from;
-                } else if (from && to) {
-                    document.getElementById('captureDateFilterValue').textContent = `${from} to ${to}`;
-                } else if (from) {
-                    document.getElementById('captureDateFilterValue').textContent = `from ${from}`;
-                } else if (to) {
-                    document.getElementById('captureDateFilterValue').textContent = `to ${to}`;
+                let text = '';
+                if (fromDate && toDate && fromDate === toDate && !fromTime && !toTime) {
+                    text = fromDate;
+                } else {
+                    const fromStr = fromDate + (fromTime ? ` ${fromTime}` : '');
+                    const toStr = toDate + (toTime ? ` ${toTime}` : '');
+                    if (fromDate && toDate) {
+                        text = `${fromStr} to ${toStr}`;
+                    } else if (fromDate) {
+                        text = `from ${fromStr}`;
+                    } else if (toDate) {
+                        text = `to ${toStr}`;
+                    }
                 }
+                document.getElementById('captureDateFilterValue').textContent = text;
             } else {
                 document.getElementById('captureDateFilter').style.display = 'none';
             }
         }
 
         function clearProcessedDateFilter() {
-            processedDateFilter = { from: null, to: null };
+            processedDateFilter = { fromDate: null, fromTime: null, toDate: null, toTime: null };
             document.getElementById('processedFromDate').value = '';
+            document.getElementById('processedFromTime').value = '';
             document.getElementById('processedToDate').value = '';
+            document.getElementById('processedToTime').value = '';
             document.getElementById('processedDateFilter').style.display = 'none';
             loadResultsWithFilters();
         }
 
         function clearCaptureDateFilter() {
-            captureDateFilter = { from: null, to: null };
+            captureDateFilter = { fromDate: null, fromTime: null, toDate: null, toTime: null };
             document.getElementById('captureFromDate').value = '';
+            document.getElementById('captureFromTime').value = '';
             document.getElementById('captureToDate').value = '';
+            document.getElementById('captureToTime').value = '';
             document.getElementById('captureDateFilter').style.display = 'none';
             loadResultsWithFilters();
         }
 
         function clearAllFilters() {
-            processedDateFilter = { from: null, to: null };
-            captureDateFilter = { from: null, to: null };
+            processedDateFilter = { fromDate: null, fromTime: null, toDate: null, toTime: null };
+            captureDateFilter = { fromDate: null, fromTime: null, toDate: null, toTime: null };
             document.getElementById('processedFromDate').value = '';
+            document.getElementById('processedFromTime').value = '';
             document.getElementById('processedToDate').value = '';
+            document.getElementById('processedToTime').value = '';
             document.getElementById('captureFromDate').value = '';
+            document.getElementById('captureFromTime').value = '';
             document.getElementById('captureToDate').value = '';
+            document.getElementById('captureToTime').value = '';
             document.getElementById('processedDateFilter').style.display = 'none';
             document.getElementById('captureDateFilter').style.display = 'none';
             loadResultsWithFilters();
@@ -2446,6 +2514,38 @@
 
         async function loadResultsWithFilters() {
             await fetchResults('/api/results');
+        }
+
+        async function viewResultsInExplorer(fromDate, fromTime, toDate, toTime) {
+            // Switch to the results tab
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            const resultsTab = document.querySelector('.tab[data-tab="results"]');
+            resultsTab.classList.add('active');
+            document.getElementById('results').classList.add('active');
+
+            // Set the processed datetime filter to the processing time range
+            processedDateFilter = { fromDate, fromTime, toDate, toTime };
+            document.getElementById('processedFromDate').value = fromDate;
+            document.getElementById('processedFromTime').value = fromTime;
+            document.getElementById('processedToDate').value = toDate;
+            document.getElementById('processedToTime').value = toTime;
+            updateProcessedDateFilterDisplay();
+
+            // Load stats and results with filter
+            await loadResultStats();
+            await loadResultsWithFilters();
+
+            // Wait a bit for results to load, then auto-expand all result cards
+            setTimeout(() => {
+                const resultCards = document.querySelectorAll('.result-card');
+                resultCards.forEach((card, index) => {
+                    const header = card.querySelector('.result-header');
+                    if (header) {
+                        header.click();
+                    }
+                });
+            }, 500);
         }
 
         async function loadAllResults() {
@@ -2463,8 +2563,8 @@
                 let results = data.results;
 
                 // Apply filters if set
-                const hasProcessedFilter = processedDateFilter.from || processedDateFilter.to;
-                const hasCaptureFilter = captureDateFilter.from || captureDateFilter.to;
+                const hasProcessedFilter = processedDateFilter.fromDate || processedDateFilter.toDate;
+                const hasCaptureFilter = captureDateFilter.fromDate || captureDateFilter.toDate;
 
                 if (hasProcessedFilter || hasCaptureFilter) {
                     // We need to fetch each result JSON to check filters
@@ -2478,14 +2578,22 @@
 
                             let passesFilters = true;
 
-                            // Check processed date filter (range)
+                            // Check processed datetime filter (range)
                             if (hasProcessedFilter) {
                                 if (resultData.processed_at) {
-                                    const processedDate = resultData.processed_at.split('T')[0];
-                                    if (processedDateFilter.from && processedDate < processedDateFilter.from) {
+                                    // processed_at format: "2026-01-28T12:09:45.462828Z"
+                                    const processedDateTime = resultData.processed_at;
+
+                                    // Build from and to datetime strings for comparison
+                                    const fromDateTime = processedDateFilter.fromDate ?
+                                        `${processedDateFilter.fromDate}T${processedDateFilter.fromTime || '00:00:00'}` : null;
+                                    const toDateTime = processedDateFilter.toDate ?
+                                        `${processedDateFilter.toDate}T${processedDateFilter.toTime || '23:59:59'}` : null;
+
+                                    if (fromDateTime && processedDateTime < fromDateTime) {
                                         passesFilters = false;
                                     }
-                                    if (processedDateFilter.to && processedDate > processedDateFilter.to) {
+                                    if (toDateTime && processedDateTime > toDateTime) {
                                         passesFilters = false;
                                     }
                                 } else {
@@ -2493,19 +2601,27 @@
                                 }
                             }
 
-                            // Check capture date filter (range)
+                            // Check capture datetime filter (range)
                             if (passesFilters && hasCaptureFilter) {
                                 if (resultData.input_uri) {
                                     const inputFilename = resultData.input_uri.split('/').pop();
-                                    // Parse filename to get date (reolink_00_YYYYMMDDHHMMSS.jpg)
+                                    // Parse filename to get datetime (reolink_00_YYYYMMDDHHMMSS.jpg)
                                     const match = inputFilename.match(/\d{14}/);
                                     if (match) {
                                         const timestamp = match[0];
-                                        const captureDate = `${timestamp.substr(0,4)}-${timestamp.substr(4,2)}-${timestamp.substr(6,2)}`;
-                                        if (captureDateFilter.from && captureDate < captureDateFilter.from) {
+                                        // Convert to ISO format: YYYY-MM-DDTHH:MM:SS
+                                        const captureDateTime = `${timestamp.substr(0,4)}-${timestamp.substr(4,2)}-${timestamp.substr(6,2)}T${timestamp.substr(8,2)}:${timestamp.substr(10,2)}:${timestamp.substr(12,2)}`;
+
+                                        // Build from and to datetime strings for comparison
+                                        const fromDateTime = captureDateFilter.fromDate ?
+                                            `${captureDateFilter.fromDate}T${captureDateFilter.fromTime || '00:00:00'}` : null;
+                                        const toDateTime = captureDateFilter.toDate ?
+                                            `${captureDateFilter.toDate}T${captureDateFilter.toTime || '23:59:59'}` : null;
+
+                                        if (fromDateTime && captureDateTime < fromDateTime) {
                                             passesFilters = false;
                                         }
-                                        if (captureDateFilter.to && captureDate > captureDateFilter.to) {
+                                        if (toDateTime && captureDateTime > toDateTime) {
                                             passesFilters = false;
                                         }
                                     } else {
