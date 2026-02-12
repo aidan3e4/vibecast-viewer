@@ -898,6 +898,107 @@
         .input-clickable:hover input {
             border-color: #e94560;
         }
+
+        /* Time Range Slider */
+        .time-slider-container {
+            display: none;
+            background: #0f3460;
+            border-radius: 8px;
+            padding: 18px 24px 14px;
+            margin-bottom: 16px;
+        }
+        .time-slider-container.visible {
+            display: block;
+        }
+        .time-slider-label-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            color: #aaa;
+            font-size: 0.85em;
+        }
+        .time-slider-label-row .slider-time-value {
+            color: #e94560;
+            font-weight: 600;
+            font-size: 1.05em;
+            min-width: 52px;
+        }
+        .time-slider-label-row .slider-count {
+            color: #888;
+            font-size: 0.9em;
+        }
+        .time-slider-track-wrapper {
+            position: relative;
+            height: 36px;
+            width: 100%;
+        }
+        .time-slider-track-wrapper input[type="range"] {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 36px;
+            margin: 0;
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+            pointer-events: none;
+            z-index: 2;
+        }
+        .time-slider-track-wrapper input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #e94560;
+            border: 2px solid #fff;
+            cursor: pointer;
+            pointer-events: all;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.4);
+            position: relative;
+            z-index: 3;
+        }
+        .time-slider-track-wrapper input[type="range"]::-moz-range-thumb {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #e94560;
+            border: 2px solid #fff;
+            cursor: pointer;
+            pointer-events: all;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.4);
+        }
+        .time-slider-track-bg {
+            position: absolute;
+            top: 14px;
+            left: 0;
+            right: 0;
+            height: 8px;
+            border-radius: 4px;
+            background: #16213e;
+            z-index: 0;
+        }
+        .time-slider-track-fill {
+            position: absolute;
+            top: 14px;
+            height: 8px;
+            border-radius: 4px;
+            background: #e94560;
+            z-index: 1;
+        }
+        .time-slider-ticks {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0 0;
+        }
+        .time-slider-ticks span {
+            color: #666;
+            font-size: 0.75em;
+            text-align: center;
+            min-width: 32px;
+        }
     </style>
 </head>
 <body>
@@ -1026,6 +1127,20 @@
                             Process Images
                         </button>
                     </div>
+                </div>
+                <div class="time-slider-container" id="timeSliderContainer">
+                    <div class="time-slider-label-row">
+                        <span class="slider-time-value" id="sliderFromLabel">00:00</span>
+                        <span class="slider-count" id="sliderVisibleCount"></span>
+                        <span class="slider-time-value" id="sliderToLabel" style="text-align: right;">23:59</span>
+                    </div>
+                    <div class="time-slider-track-wrapper">
+                        <div class="time-slider-track-bg"></div>
+                        <div class="time-slider-track-fill" id="sliderFill"></div>
+                        <input type="range" id="sliderMin" min="0" max="1439" value="0" oninput="onTimeSliderChange()">
+                        <input type="range" id="sliderMax" min="0" max="1439" value="1439" oninput="onTimeSliderChange()">
+                    </div>
+                    <div class="time-slider-ticks" id="sliderTicks"></div>
                 </div>
                 <div class="image-grid" id="imageGrid"></div>
             </div>
@@ -1500,6 +1615,172 @@
             });
         }
 
+        // --- Time Range Slider ---
+        let allLoadedImages = []; // unfiltered copy of loaded images
+
+        function timeToMinutes(timeStr) {
+            // "HH:MM" or "HH:MM:SS"
+            const parts = timeStr.split(':');
+            return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+        }
+
+        function minutesToLabel(m) {
+            const h = Math.floor(m / 60);
+            const min = m % 60;
+            return String(h).padStart(2, '0') + ':' + String(min).padStart(2, '0');
+        }
+
+        function initTimeSlider(images) {
+            const container = document.getElementById('timeSliderContainer');
+            if (!images || images.length === 0) {
+                container.classList.remove('visible');
+                return;
+            }
+
+            allLoadedImages = images;
+
+            // Extract min/max minutes from image times
+            let minMin = 1439, maxMin = 0;
+            images.forEach(img => {
+                const m = timeToMinutes(img.time);
+                if (m < minMin) minMin = m;
+                if (m > maxMin) maxMin = m;
+            });
+
+            // Ensure at least a 1-minute range
+            if (minMin >= maxMin) maxMin = minMin + 1;
+
+            const sliderMinEl = document.getElementById('sliderMin');
+            const sliderMaxEl = document.getElementById('sliderMax');
+            sliderMinEl.min = sliderMaxEl.min = minMin;
+            sliderMinEl.max = sliderMaxEl.max = maxMin;
+            sliderMinEl.value = minMin;
+            sliderMaxEl.value = maxMin;
+
+            // Generate ticks
+            generateSliderTicks(minMin, maxMin);
+
+            // Show
+            container.classList.add('visible');
+            updateSliderUI();
+
+            // Show initial count
+            document.getElementById('sliderVisibleCount').textContent =
+                `Showing ${images.length} of ${images.length} images`;
+        }
+
+        function generateSliderTicks(minMin, maxMin) {
+            const ticksEl = document.getElementById('sliderTicks');
+            const range = maxMin - minMin;
+
+            // Choose interval: aim for 4-8 ticks
+            let interval;
+            if (range <= 60) interval = 10;        // every 10 min
+            else if (range <= 180) interval = 30;   // every 30 min
+            else if (range <= 480) interval = 60;   // every 1h
+            else interval = 120;                     // every 2h
+
+            // Snap first tick up to next multiple of interval
+            const firstTick = Math.ceil(minMin / interval) * interval;
+            const ticks = [];
+            for (let t = firstTick; t <= maxMin; t += interval) {
+                ticks.push(t);
+            }
+
+            // Always include start and end
+            if (ticks.length === 0 || ticks[0] !== minMin) ticks.unshift(minMin);
+            if (ticks[ticks.length - 1] !== maxMin) ticks.push(maxMin);
+
+            ticksEl.innerHTML = ticks.map(t => {
+                const pct = ((t - minMin) / (maxMin - minMin)) * 100;
+                return `<span style="position:absolute;left:${pct}%;transform:translateX(-50%)">${minutesToLabel(t)}</span>`;
+            }).join('');
+            ticksEl.style.position = 'relative';
+            ticksEl.style.height = '18px';
+        }
+
+        function updateSliderUI() {
+            const sliderMinEl = document.getElementById('sliderMin');
+            const sliderMaxEl = document.getElementById('sliderMax');
+            let lo = parseInt(sliderMinEl.value);
+            let hi = parseInt(sliderMaxEl.value);
+
+            // Prevent crossing
+            if (lo > hi) {
+                lo = hi;
+                sliderMinEl.value = lo;
+            }
+
+            document.getElementById('sliderFromLabel').textContent = minutesToLabel(lo);
+            document.getElementById('sliderToLabel').textContent = minutesToLabel(hi);
+
+            // Update fill bar
+            const rangeMin = parseInt(sliderMinEl.min);
+            const rangeMax = parseInt(sliderMinEl.max);
+            const total = rangeMax - rangeMin || 1;
+            const leftPct = ((lo - rangeMin) / total) * 100;
+            const rightPct = ((hi - rangeMin) / total) * 100;
+            const fill = document.getElementById('sliderFill');
+            fill.style.left = leftPct + '%';
+            fill.style.width = (rightPct - leftPct) + '%';
+        }
+
+        function onTimeSliderChange() {
+            const sliderMinEl = document.getElementById('sliderMin');
+            const sliderMaxEl = document.getElementById('sliderMax');
+            let lo = parseInt(sliderMinEl.value);
+            let hi = parseInt(sliderMaxEl.value);
+
+            // Prevent crossing
+            if (lo > hi) {
+                if (document.activeElement === sliderMinEl) {
+                    sliderMinEl.value = hi;
+                    lo = hi;
+                } else {
+                    sliderMaxEl.value = lo;
+                    hi = lo;
+                }
+            }
+
+            updateSliderUI();
+
+            // Filter images
+            const filtered = allLoadedImages.filter(img => {
+                const m = timeToMinutes(img.time);
+                return m >= lo && m <= hi;
+            });
+
+            // Update count
+            document.getElementById('sliderVisibleCount').textContent =
+                `Showing ${filtered.length} of ${allLoadedImages.length} images`;
+            document.getElementById('dayImageCount').textContent = filtered.length;
+
+            // Re-render grid
+            const grid = document.getElementById('imageGrid');
+            if (filtered.length === 0) {
+                grid.innerHTML = '<div class="empty-state">No images in this time range</div>';
+                currentImages = [];
+                return;
+            }
+
+            currentImages = filtered;
+            grid.innerHTML = filtered.map((img, index) => {
+                const selectionCount = getSelectionCountForImage(img.key);
+                const hasSelection = selectionCount > 0;
+                const badge = hasSelection ? `<div class="selection-badge"><span>&#10003;</span> ${selectionCount}</div>` : '';
+                return `
+                    <div class="image-card ${hasSelection ? 'has-selection' : ''}" data-image-key="${img.key}" onclick="showUnwarped('${img.key}', '${img.filename}', ${index})">
+                        ${badge}
+                        <img src="${img.url}" alt="${img.filename}" loading="lazy">
+                        <div class="info">
+                            <div class="filename">${img.filename}</div>
+                            <div class="time">${img.date} ${img.time}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
         async function loadImagesForRange() {
             const fromDate = document.getElementById('fromDate').value;
             const toDate = document.getElementById('toDate').value;
@@ -1531,6 +1812,7 @@
 
                 if (data.count === 0) {
                     grid.innerHTML = '<div class="empty-state">No images found in this range</div>';
+                    initTimeSlider([]);
                     return;
                 }
 
@@ -1550,6 +1832,9 @@
                         </div>
                     `;
                 }).join('');
+
+                // Initialize time range slider
+                initTimeSlider(data.images);
             } catch (error) {
                 grid.innerHTML = `<div class="empty-state">Error: ${error.message}</div>`;
             }
