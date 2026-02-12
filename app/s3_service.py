@@ -72,11 +72,9 @@ def check_aws_credentials() -> dict[str, Any]:
 def parse_image_filename(filename: str) -> dict | None:
     """Parse image filename to extract timestamp.
 
-    Handles formats:
-    - reolink_00_YYYYMMDDHHMMSS.jpg
-    - Reolink_00_YYYYMMDDHHMMSS.jpg
+    Handles format: <name>_<digits>_YYYYMMDDHHMMSS.jpg
     """
-    match = re.match(r"[Rr]eolink_\d+_(\d{14})\.jpg", filename)
+    match = re.match(r".+_\d+_(\d{14})\.jpg", filename)
     if not match:
         return None
 
