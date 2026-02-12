@@ -1577,6 +1577,7 @@
             title.textContent = filename;
             grid.innerHTML = '<div class="empty-state"><div class="spinner"></div> Loading unwarped images...</div>';
             unwarpButton.style.display = 'none';
+            unwarpButton.disabled = false;
             unwarpStatus.textContent = '';
             modal.classList.add('show');
 
