@@ -302,7 +302,7 @@ def get_s3_uri(key: str) -> str:
 def get_unwarped_images(image_key: str) -> dict[str, dict]:
     """Check which unwarped images exist for a raw fisheye image.
 
-    Returns dict mapping direction to {exists, key, url}
+    Returns dict mapping direction to {exists, key, url, rotated_exists, rotated_key, rotated_url}
     """
     s3 = get_s3_client()
 
@@ -332,11 +332,24 @@ def get_unwarped_images(image_key: str) -> dict[str, dict]:
             exists = False
             url = None
 
+        # Check if rotated variant exists
+        rotated_key = f"{unwarped_prefix}{base_name}_{direction}_rotated.jpg"
+        try:
+            s3.head_object(Bucket=BUCKET_NAME, Key=rotated_key)
+            rotated_exists = True
+            rotated_url = get_presigned_url(rotated_key)
+        except ClientError:
+            rotated_exists = False
+            rotated_url = None
+
         result[direction] = {
             "exists": exists,
             "key": unwarped_key,
             "url": url,
             "direction": direction.capitalize(),
+            "rotated_exists": rotated_exists,
+            "rotated_key": rotated_key,
+            "rotated_url": rotated_url,
         }
 
     return result
