@@ -1338,6 +1338,12 @@
                     <button class="btn btn-success" id="modalProcessButton" onclick="goToProcessTab()" style="display: none;">
                         Process Images
                     </button>
+                    <div id="rotationControls" style="display: none; align-items: center; gap: 6px;">
+                        <label style="font-size: 0.85em; white-space: nowrap;">Rotation:</label>
+                        <input type="number" id="rotationAngle" placeholder="0" step="any"
+                               style="width: 70px; padding: 4px 6px; border: 1px solid #555; border-radius: 4px; background: #2a2a2a; color: #fff; font-size: 0.85em;">
+                        <span style="font-size: 0.85em;">deg</span>
+                    </div>
                     <span id="unwarpStatus" style="color: #888; font-size: 0.9em;"></span>
                     <button class="modal-close" onclick="closeModal()">&times;</button>
                 </div>
@@ -1880,6 +1886,9 @@
                     unwarpButton.style.display = 'block';
                 }
 
+                // Show rotation controls if unwarped images exist
+                document.getElementById('rotationControls').style.display = anyExist ? 'flex' : 'none';
+
                 // Get the fisheye image URL from currentImages
                 let fisheyeUrl = '';
                 if (currentImageIndex >= 0 && currentImageIndex < currentImages.length) {
@@ -1903,15 +1912,29 @@
                 gridHTML += directions.map(dir => {
                     const item = data.unwarped[dir];
                     if (item && item.exists) {
-                        const s3Key = item.s3_key || '';
+                        const s3Key = item.key || '';
+                        const displayUrl = item.rotated_exists ? item.rotated_url : item.url;
+                        const displayLabel = item.rotated_exists ? `${item.direction} (rotated)` : item.direction;
                         return `
-                            <div class="unwarped-item" data-url="${item.url}" data-label="${item.direction}">
+                            <div class="unwarped-item" data-url="${displayUrl}" data-label="${displayLabel}">
                                 <div class="direction">
-                                    <span>${item.direction}</span>
+                                    <span>${displayLabel}</span>
                                     <input type="checkbox" class="selection-checkbox"
-                                           onclick="event.stopPropagation(); toggleImageSelection('${item.url}', '${item.direction}', '${s3Key}')">
+                                           onclick="event.stopPropagation(); toggleImageSelection('${displayUrl}', '${item.direction}', '${s3Key}')">
                                 </div>
-                                <img src="${item.url}" alt="${item.direction}" onclick="openFullscreen('${item.url}', '${item.direction}')" style="cursor: zoom-in;">
+                                <img src="${displayUrl}" alt="${item.direction}" onclick="openFullscreen('${displayUrl}', '${displayLabel}')" style="cursor: zoom-in;">
+                                <div style="display: flex; gap: 4px; padding: 4px;">
+                                    <button class="btn btn-secondary" style="flex: 1; padding: 2px 6px; font-size: 0.75em;"
+                                            onclick="event.stopPropagation(); rotateImage('${s3Key}')">
+                                        Rotate
+                                    </button>
+                                    ${item.rotated_exists ? `
+                                    <button class="btn btn-secondary" style="flex: 1; padding: 2px 6px; font-size: 0.75em; color: #f44336;"
+                                            onclick="event.stopPropagation(); unrotateImage('${s3Key}')">
+                                        Unrotate
+                                    </button>
+                                    ` : ''}
+                                </div>
                             </div>
                         `;
                     } else {
@@ -2006,6 +2029,65 @@
 
         async function manualUnwarp() {
             await triggerUnwarp();
+        }
+
+        async function rotateImage(imageKey) {
+            const angleInput = document.getElementById('rotationAngle');
+            const angle = parseFloat(angleInput.value);
+            if (isNaN(angle) || angle === 0) {
+                alert('Please enter a non-zero rotation angle.');
+                return;
+            }
+
+            const unwarpStatus = document.getElementById('unwarpStatus');
+            unwarpStatus.innerHTML = '<div class="spinner"></div> Rotating...';
+
+            try {
+                const response = await fetch(`/api/rotate?image_key=${encodeURIComponent(imageKey)}&angle=${angle}`, {
+                    method: 'POST'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Rotation failed');
+                }
+
+                unwarpStatus.textContent = 'Rotation complete! Refreshing...';
+
+                // Refresh the modal to show rotated image
+                setTimeout(() => {
+                    showUnwarped(currentImageKey, currentImageFilename, currentImageIndex);
+                }, 1000);
+
+            } catch (error) {
+                unwarpStatus.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function unrotateImage(imageKey) {
+            const unwarpStatus = document.getElementById('unwarpStatus');
+            unwarpStatus.innerHTML = '<div class="spinner"></div> Removing rotation...';
+
+            try {
+                const response = await fetch(`/api/rotated?image_key=${encodeURIComponent(imageKey)}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Unrotate failed');
+                }
+
+                unwarpStatus.textContent = 'Rotation removed! Refreshing...';
+
+                // Refresh the modal
+                setTimeout(() => {
+                    showUnwarped(currentImageKey, currentImageFilename, currentImageIndex);
+                }, 1000);
+
+            } catch (error) {
+                unwarpStatus.textContent = `Error: ${error.message}`;
+            }
         }
 
         function closeModal() {
