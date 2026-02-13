@@ -337,6 +337,75 @@ async def unwarp_image(image_key: str) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/rotate")
+async def rotate_image(image_key: str, angle: float) -> dict[str, Any]:
+    """Rotate an unwarped image by a given angle via Lambda.
+
+    Args:
+        image_key: S3 key of the unwarped image
+        angle: Rotation angle in degrees clockwise
+    """
+    try:
+        s3_uri = s3_service.get_s3_uri(image_key)
+
+        lambda_client = boto3.client('lambda', region_name=s3_service.AWS_REGION)
+
+        payload = {
+            "input_s3_uri": s3_uri,
+            "rotate": True,
+            "rotation_angle": angle,
+        }
+
+        response = lambda_client.invoke(
+            FunctionName='vibecast-process-image',
+            InvocationType='RequestResponse',
+            Payload=json.dumps(payload)
+        )
+
+        response_payload = json.loads(response['Payload'].read())
+
+        body = response_payload.get('body', {})
+        if isinstance(body, str):
+            body = json.loads(body)
+
+        if response_payload.get('statusCode') != 200:
+            error_msg = body.get('error', 'Unknown error')
+            raise HTTPException(
+                status_code=response_payload.get('statusCode', 500),
+                detail=f"Lambda error: {error_msg}"
+            )
+
+        return body
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_str = str(e)
+        if "credentials" in error_str.lower():
+            raise HTTPException(status_code=500, detail=f"AWS credentials error: {error_str}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/rotated")
+async def delete_rotated_image(image_key: str) -> dict[str, Any]:
+    """Delete the rotated variant of an unwarped image.
+
+    Args:
+        image_key: S3 key of the original unwarped image (not the rotated one)
+    """
+    try:
+        name_without_ext, ext = image_key.rsplit(".", 1)
+        rotated_key = f"{name_without_ext}_rotated.{ext}"
+
+        s3 = s3_service.get_s3_client()
+        s3.delete_object(Bucket=s3_service.BUCKET_NAME, Key=rotated_key)
+
+        return {"deleted": rotated_key}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============================================================================
 # API Endpoints - Results
 # ============================================================================
