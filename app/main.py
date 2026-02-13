@@ -225,6 +225,17 @@ async def get_image_url(key: str) -> dict[str, str]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/unwarped-status")
+async def unwarped_status(request: dict[str, Any]) -> dict[str, Any]:
+    """Batch check which images have unwarped variants."""
+    try:
+        image_keys = request.get("image_keys", [])
+        status = s3_service.batch_check_unwarped(image_keys)
+        return {"status": status}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/unwarped")
 async def get_unwarped(image_key: str) -> dict[str, Any]:
     """Get unwarped images for a raw fisheye image."""

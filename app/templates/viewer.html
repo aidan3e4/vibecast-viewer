@@ -258,10 +258,6 @@
             object-fit: cover;
         }
 
-        .image-card .info {
-            padding: 12px;
-        }
-
         .image-card .filename {
             font-weight: 500;
             color: #ddd;
@@ -275,6 +271,31 @@
             color: #888;
             font-size: 0.8em;
             margin-top: 4px;
+        }
+
+        .image-card .info {
+            padding: 12px;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .image-card .info-text {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .image-card .unwarped-indicator {
+            flex-shrink: 0;
+            color: #64B5F6;
+            font-size: 1.1em;
+            margin-top: 2px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .image-card .unwarped-indicator.visible {
+            opacity: 1;
         }
 
         /* Modal */
@@ -1338,8 +1359,8 @@
                     <button class="btn btn-success" id="modalProcessButton" onclick="goToProcessTab()" style="display: none;">
                         Process Images
                     </button>
-                    <div id="rotationControls" style="display: none; align-items: center; gap: 6px;">
-                        <label style="font-size: 0.85em; white-space: nowrap;">Rotation:</label>
+                    <div id="rotationControls" style="display: none; align-items: center; gap: 6px; border: 1px solid #555; border-radius: 6px; padding: 4px 10px; background: #1e1e1e;">
+                        <label style="font-size: 0.85em; white-space: nowrap;">Rotate (clockwise):</label>
                         <input type="number" id="rotationAngle" placeholder="0" step="any"
                                style="width: 70px; padding: 4px 6px; border: 1px solid #555; border-radius: 4px; background: #2a2a2a; color: #fff; font-size: 0.85em;">
                         <span style="font-size: 0.85em;">deg</span>
@@ -1365,6 +1386,14 @@
                 </div>
                 <button class="fullscreen-nav-btn" id="fullscreenNextBtn" onclick="navigateFullscreen(1); event.stopPropagation();" title="Next image (Right Arrow)">&#9654;</button>
                 <button class="selection-toggle-btn" id="fullscreenSelectBtn" onclick="toggleCurrentFullscreenSelection(); event.stopPropagation();">Select Image</button>
+                <div id="fullscreenRotationControls" style="display: none; align-items: center; gap: 6px; border: 1px solid #555; border-radius: 6px; padding: 4px 8px; background: rgba(30,30,30,0.9);" onclick="event.stopPropagation();">
+                    <input type="number" id="fullscreenRotationAngle" placeholder="0" step="any"
+                           style="width: 60px; padding: 3px 5px; border: 1px solid #555; border-radius: 4px; background: #2a2a2a; color: #fff; font-size: 0.8em;">
+                    <span style="font-size: 0.8em; color: #ccc;">deg</span>
+                    <button class="selection-toggle-btn" onclick="rotateFullscreenImage(); event.stopPropagation();" style="padding: 3px 8px; font-size: 0.8em;">Rotate</button>
+                    <button class="selection-toggle-btn" id="fullscreenUnrotateBtn" onclick="unrotateFullscreenImage(); event.stopPropagation();" style="padding: 3px 8px; font-size: 0.8em; color: #f44336; display: none;">Unrotate</button>
+                    <span id="fullscreenRotateStatus" style="font-size: 0.8em; color: #888;"></span>
+                </div>
             </div>
             <img id="fullscreenImg" src="" alt="" onclick="event.stopPropagation()">
             <button class="fullscreen-close" onclick="closeFullscreen(); event.stopPropagation();" title="Close (Esc)">&#10005;</button>
@@ -1779,12 +1808,18 @@
                         ${badge}
                         <img src="${img.url}" alt="${img.filename}" loading="lazy">
                         <div class="info">
-                            <div class="filename">${img.filename}</div>
-                            <div class="time">${img.date} ${img.time}</div>
+                            <div class="info-text">
+                                <div class="filename">${img.filename}</div>
+                                <div class="time">${img.date} ${img.time}</div>
+                            </div>
+                            <span class="unwarped-indicator" title="Has unwarped images">&#9678;</span>
                         </div>
                     </div>
                 `;
             }).join('');
+
+            // Check unwarped status for filtered images
+            checkUnwarpedStatus(filtered);
         }
 
         async function loadImagesForRange() {
@@ -1832,17 +1867,45 @@
                             ${badge}
                             <img src="${img.url}" alt="${img.filename}" loading="lazy">
                             <div class="info">
-                                <div class="filename">${img.filename}</div>
-                                <div class="time">${img.date} ${img.time}</div>
+                                <div class="info-text">
+                                    <div class="filename">${img.filename}</div>
+                                    <div class="time">${img.date} ${img.time}</div>
+                                </div>
+                                <span class="unwarped-indicator" title="Has unwarped images">&#9678;</span>
                             </div>
                         </div>
                     `;
                 }).join('');
 
+                // Check unwarped status for loaded images
+                checkUnwarpedStatus(data.images);
+
                 // Initialize time range slider
                 initTimeSlider(data.images);
             } catch (error) {
                 grid.innerHTML = `<div class="empty-state">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function checkUnwarpedStatus(images) {
+            const keys = images.map(img => img.key);
+            try {
+                const response = await fetch('/api/unwarped-status', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({image_keys: keys})
+                });
+                const data = await response.json();
+                const status = data.status;
+                document.querySelectorAll('.image-card').forEach(card => {
+                    const key = card.dataset.imageKey;
+                    if (status[key]) {
+                        const indicator = card.querySelector('.unwarped-indicator');
+                        if (indicator) indicator.classList.add('visible');
+                    }
+                });
+            } catch (err) {
+                console.error('Failed to check unwarped status:', err);
             }
         }
 
@@ -1914,27 +1977,28 @@
                     if (item && item.exists) {
                         const s3Key = item.key || '';
                         const displayUrl = item.rotated_exists ? item.rotated_url : item.url;
-                        const displayLabel = item.rotated_exists ? `${item.direction} (rotated)` : item.direction;
+                        const rotatedTag = item.rotated_exists ? ' (rotated)' : '';
                         return `
-                            <div class="unwarped-item" data-url="${displayUrl}" data-label="${displayLabel}">
+                            <div class="unwarped-item" data-url="${displayUrl}" data-label="${item.direction}" data-s3key="${s3Key}">
                                 <div class="direction">
-                                    <span>${displayLabel}</span>
-                                    <input type="checkbox" class="selection-checkbox"
-                                           onclick="event.stopPropagation(); toggleImageSelection('${displayUrl}', '${item.direction}', '${s3Key}')">
+                                    <span>${item.direction}${rotatedTag}</span>
+                                    <div style="display: flex; gap: 4px; align-items: center;">
+                                        <button class="btn btn-secondary" style="padding: 1px 6px; font-size: 0.7em;"
+                                                onclick="event.stopPropagation(); rotateImage('${s3Key}')" title="Rotate this image">
+                                            Rotate
+                                        </button>
+                                        ${item.rotated_exists ? `
+                                        <button class="btn btn-secondary" style="padding: 1px 6px; font-size: 0.7em; color: #f44336;"
+                                                onclick="event.stopPropagation(); unrotateImage('${s3Key}')" title="Remove rotation">
+                                            Unrotate
+                                        </button>
+                                        ` : ''}
+                                        <span style="border-left: 1px solid #555; height: 16px; margin: 0 2px;"></span>
+                                        <input type="checkbox" class="selection-checkbox"
+                                               onclick="event.stopPropagation(); toggleImageSelection('${displayUrl}', '${item.direction}', '${s3Key}')">
+                                    </div>
                                 </div>
-                                <img src="${displayUrl}" alt="${item.direction}" onclick="openFullscreen('${displayUrl}', '${displayLabel}')" style="cursor: zoom-in;">
-                                <div style="display: flex; gap: 4px; padding: 4px;">
-                                    <button class="btn btn-secondary" style="flex: 1; padding: 2px 6px; font-size: 0.75em;"
-                                            onclick="event.stopPropagation(); rotateImage('${s3Key}')">
-                                        Rotate
-                                    </button>
-                                    ${item.rotated_exists ? `
-                                    <button class="btn btn-secondary" style="flex: 1; padding: 2px 6px; font-size: 0.75em; color: #f44336;"
-                                            onclick="event.stopPropagation(); unrotateImage('${s3Key}')">
-                                        Unrotate
-                                    </button>
-                                    ` : ''}
-                                </div>
+                                <img src="${displayUrl}" alt="${item.direction}" onclick="openFullscreen('${displayUrl}', '${item.direction}')" style="cursor: zoom-in;">
                             </div>
                         `;
                     } else {
@@ -2015,6 +2079,13 @@
                 unwarpStatus.textContent = 'Unwarp complete! Refreshing...';
                 unwarpButton.style.display = 'none';
 
+                // Mark the unwarped indicator visible on the image card
+                const card = document.querySelector(`.image-card[data-image-key="${currentImageKey}"]`);
+                if (card) {
+                    const indicator = card.querySelector('.unwarped-indicator');
+                    if (indicator) indicator.classList.add('visible');
+                }
+
                 // Refresh the unwarped images after a short delay
                 setTimeout(() => {
                     showUnwarped(currentImageKey, currentImageFilename, currentImageIndex);
@@ -2090,6 +2161,89 @@
             }
         }
 
+        async function rotateFullscreenImage() {
+            if (currentFullscreenIndex < 0 || currentFullscreenIndex >= fullscreenImages.length) return;
+            const currentImage = fullscreenImages[currentFullscreenIndex];
+            if (!currentImage.s3Key) return;
+
+            const angleInput = document.getElementById('fullscreenRotationAngle');
+            const angle = parseFloat(angleInput.value);
+            if (isNaN(angle) || angle === 0) {
+                alert('Please enter a non-zero rotation angle.');
+                return;
+            }
+
+            const status = document.getElementById('fullscreenRotateStatus');
+            status.innerHTML = 'Rotating...';
+
+            try {
+                const response = await fetch(`/api/rotate?image_key=${encodeURIComponent(currentImage.s3Key)}&angle=${angle}`, {
+                    method: 'POST'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Rotation failed');
+                }
+
+                status.textContent = 'Done!';
+
+                // Fetch new rotated URL and update fullscreen image in-place
+                const urlResp = await fetch(`/api/image-url?key=${encodeURIComponent(currentImage.s3Key.replace('.jpg', '_rotated.jpg'))}`);
+                if (urlResp.ok) {
+                    const urlData = await urlResp.json();
+                    document.getElementById('fullscreenImg').src = urlData.url;
+                    fullscreenImages[currentFullscreenIndex].url = urlData.url;
+                    // Show unrotate button
+                    document.getElementById('fullscreenUnrotateBtn').style.display = 'inline-block';
+                }
+
+                // Also refresh the modal grid in background so it's up-to-date when we close fullscreen
+                showUnwarped(currentImageKey, currentImageFilename, currentImageIndex);
+
+            } catch (error) {
+                status.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function unrotateFullscreenImage() {
+            if (currentFullscreenIndex < 0 || currentFullscreenIndex >= fullscreenImages.length) return;
+            const currentImage = fullscreenImages[currentFullscreenIndex];
+            if (!currentImage.s3Key) return;
+
+            const status = document.getElementById('fullscreenRotateStatus');
+            status.innerHTML = 'Removing...';
+
+            try {
+                const response = await fetch(`/api/rotated?image_key=${encodeURIComponent(currentImage.s3Key)}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Unrotate failed');
+                }
+
+                status.textContent = 'Done!';
+
+                // Fetch original (non-rotated) URL and update fullscreen image in-place
+                const urlResp = await fetch(`/api/image-url?key=${encodeURIComponent(currentImage.s3Key)}`);
+                if (urlResp.ok) {
+                    const urlData = await urlResp.json();
+                    document.getElementById('fullscreenImg').src = urlData.url;
+                    fullscreenImages[currentFullscreenIndex].url = urlData.url;
+                    // Hide unrotate button
+                    document.getElementById('fullscreenUnrotateBtn').style.display = 'none';
+                }
+
+                // Also refresh the modal grid in background
+                showUnwarped(currentImageKey, currentImageFilename, currentImageIndex);
+
+            } catch (error) {
+                status.textContent = `Error: ${error.message}`;
+            }
+        }
+
         function closeModal() {
             document.getElementById('unwarpedModal').classList.remove('show');
             // Don't reset currentImageIndex so we can reopen at the same position if needed
@@ -2104,10 +2258,12 @@
             items.forEach(item => {
                 const img = item.querySelector('img');
                 const label = item.dataset.label;
+                const s3Key = item.dataset.s3key || '';
                 if (img && label) {
                     fullscreenImages.push({
                         url: img.src,
-                        label: label
+                        label: label,
+                        s3Key: s3Key
                     });
                 }
             });
@@ -2168,6 +2324,20 @@
             } else {
                 selectBtn.style.display = 'flex';
                 updateFullscreenSelectionButton(currentImage.label);
+            }
+
+            // Show rotation controls for unwarped images (not fisheye)
+            const fsRotControls = document.getElementById('fullscreenRotationControls');
+            const fsUnrotateBtn = document.getElementById('fullscreenUnrotateBtn');
+            const fsRotateStatus = document.getElementById('fullscreenRotateStatus');
+            if (currentImage.s3Key && currentImage.label !== 'Original Fisheye') {
+                fsRotControls.style.display = 'flex';
+                // Show unrotate button if image is currently rotated
+                const isRotated = currentImage.url.includes('_rotated');
+                fsUnrotateBtn.style.display = isRotated ? 'inline-block' : 'none';
+                fsRotateStatus.textContent = '';
+            } else {
+                fsRotControls.style.display = 'none';
             }
         }
 

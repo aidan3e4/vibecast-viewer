@@ -355,6 +355,46 @@ def get_unwarped_images(image_key: str) -> dict[str, dict]:
     return result
 
 
+def batch_check_unwarped(image_keys: list[str]) -> dict[str, bool]:
+    """Check which images have at least one unwarped variant.
+
+    Uses list_objects_v2 per date prefix to efficiently batch-check
+    instead of individual head_object calls per image.
+
+    Returns dict mapping image_key -> bool (has any unwarped image).
+    """
+    s3 = get_s3_client()
+
+    # Group images by their date prefix
+    date_to_basenames: dict[str, dict[str, str]] = {}  # date_prefix -> {base_name -> image_key}
+    for image_key in image_keys:
+        filename = image_key.split("/")[-1]
+        parsed = parse_image_filename(filename)
+        if not parsed:
+            continue
+        dt = parsed["datetime"]
+        date_prefix = f"{PREFIX_UNWARPED}/{dt.year}/{dt.month:02d}/{dt.day:02d}/"
+        base_name = filename.rsplit(".", 1)[0]
+        if date_prefix not in date_to_basenames:
+            date_to_basenames[date_prefix] = {}
+        date_to_basenames[date_prefix][base_name] = image_key
+
+    result = {key: False for key in image_keys}
+
+    paginator = s3.get_paginator("list_objects_v2")
+    for date_prefix, basenames in date_to_basenames.items():
+        for page in paginator.paginate(Bucket=BUCKET_NAME, Prefix=date_prefix):
+            for obj in page.get("Contents", []):
+                obj_filename = obj["Key"].split("/")[-1]
+                # Match against known base names + direction suffix
+                for base_name, image_key in basenames.items():
+                    if obj_filename.startswith(base_name + "_"):
+                        result[image_key] = True
+                        break
+
+    return result
+
+
 def list_results_by_date(date: str) -> list[dict]:
     """List result JSON files for a specific date."""
     s3 = get_s3_client()

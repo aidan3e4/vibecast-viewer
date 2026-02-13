@@ -1,3 +1,8 @@
 Viewer / UI:
-- add button to directly go to results view after processing an image
-- add old data (dan's photos) and make it work in the interface (not fisheye photos)
+
+Bugs
+- in image explorer, after opening an image and rotating it, I cant click Select image (it's not being selected, for processing)
+
+Improvements
+- improve laoding time of results
+- improve loading time of images
