@@ -2,16 +2,25 @@
 
 Deployed on [Fly.io](https://fly.io) to `vibecast-viewer` app.
 
-## Redeploy
+## First Time Setup
+
+Run this once to set AWS secrets from `.env` and deploy the app:
 
 ```bash
-fly deploy
+./deploy_first_time.sh
 ```
 
-## Set secrets (first time only)
+This will:
+1. Authenticate with Fly.io (opens browser if not already logged in)
+2. Read `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` from `.env` and push them as Fly secrets
+3. Deploy the app
+
+## Redeploying
+
+To push a new version of the app:
 
 ```bash
-fly secrets set AWS_ACCESS_KEY_ID="..." AWS_SECRET_ACCESS_KEY="..."
+./deploy_restart.sh
 ```
 
 ## View logs
