@@ -6,6 +6,23 @@
     <title>Vibecast Viewer</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <style>
+        .flatpickr-calendar { background: #16213e !important; border: 1px solid #2a2a4a !important; }
+        .flatpickr-month, .flatpickr-weekdays, .flatpickr-weekday { background: #16213e !important; color: #aaa !important; fill: #aaa !important; }
+        .flatpickr-day { color: #eee !important; }
+        .flatpickr-day:hover { background: #0f3460 !important; }
+        .flatpickr-day.selected, .flatpickr-day.selected:hover { background: #e94560 !important; border-color: #e94560 !important; }
+        .flatpickr-day.flatpickr-disabled { color: #333 !important; }
+        .flatpickr-time input, .flatpickr-time .flatpickr-am-pm { background: #0f1a2e !important; color: #eee !important; border-color: #2a2a4a !important; }
+        .flatpickr-time .numInputWrapper span { border-color: #2a2a4a !important; }
+        .flatpickr-time .numInputWrapper span:hover { background: #0f3460 !important; }
+        .numInputWrapper:hover { background: #0f1a2e !important; }
+        .flatpickr-current-month input.cur-year, .flatpickr-current-month .flatpickr-monthDropdown-months { color: #eee !important; background: #16213e !important; }
+        .flatpickr-next-month svg, .flatpickr-prev-month svg { fill: #aaa !important; }
+        .flatpickr-next-month:hover svg, .flatpickr-prev-month:hover svg { fill: #e94560 !important; }
+    </style>
     <style>
         * {
             margin: 0;
@@ -1023,15 +1040,51 @@
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>Vibecast Viewer</h1>
-        <p>Explore, process, and analyze fisheye images from S3</p>
+    <div class="header" style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h1>Vibecast Viewer</h1>
+            <p>Explore, process, and analyze fisheye images from S3</p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <label for="accountSelect" style="color: #888; font-size: 0.9em; white-space: nowrap;">Account</label>
+            <select id="accountSelect" onchange="onAccountChange()" style="
+                background: #0f3460;
+                color: #eee;
+                border: 1px solid #e94560;
+                border-radius: 6px;
+                padding: 6px 12px;
+                font-size: 0.95em;
+                cursor: pointer;
+                min-width: 160px;
+            ">
+                <option value="">Loading...</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Create account banner (hidden by default) -->
+    <div id="createAccountBanner" style="display:none; background:#0f3460; border-bottom:1px solid #e94560; padding:10px 30px;">
+        <div style="display:flex; align-items:center; gap:10px; max-width:500px;">
+            <span style="color:#aaa; font-size:0.9em; white-space:nowrap;">New account name</span>
+            <input id="newAccountName" type="text" placeholder="e.g. reolink"
+                   onkeydown="if(event.key==='Enter') submitCreateAccount(); if(event.key==='Escape') cancelCreateAccount();"
+                   style="flex:1; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:5px; padding:5px 10px; font-size:0.9em;">
+            <span style="color:#666; font-size:0.85em;">→ vibecast-<span id="newAccountPreview" style="color:#e94560;">…</span></span>
+            <button onclick="submitCreateAccount()" style="
+                background:#e94560; color:#fff; border:none; border-radius:5px;
+                padding:5px 14px; cursor:pointer; font-size:0.9em;">Create</button>
+            <button onclick="cancelCreateAccount()" style="
+                background:none; color:#888; border:1px solid #444; border-radius:5px;
+                padding:5px 10px; cursor:pointer; font-size:0.9em;">Cancel</button>
+            <span id="createAccountError" style="color:#e94560; font-size:0.85em;"></span>
+        </div>
     </div>
 
     <div class="tabs">
         <div class="tab active" data-tab="explorer">Image Explorer</div>
         <div class="tab" data-tab="process">Process Images</div>
         <div class="tab" data-tab="results">Result Explorer</div>
+        <div class="tab" data-tab="vibe">APP</div>
     </div>
 
     <!-- Tab 1: Raw Image Explorer -->
@@ -1342,6 +1395,164 @@
         </div>
     </div>
 
+    <!-- Tab 4: APP (Vibe) -->
+    <div id="vibe" class="tab-content">
+        <div style="display: flex; min-height: 60vh; background: #12121f;">
+
+            <!-- Main centered content -->
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; padding: 40px 20px;">
+                <div id="vibeLocation" style="font-size: 2.2em; font-weight: 700; color: #fff; letter-spacing: 0.01em; margin-bottom: 6px;">—</div>
+                <div id="vibeBarName" style="font-size: 1.6em; font-weight: 600; color: #aaa; margin-bottom: 50px;">—</div>
+                <div id="vibeUpdated" style="font-size: 0.8em; color: #444; margin-top: -40px; margin-bottom: 50px;"></div>
+
+                <div id="vibeBall" style="
+                    width: 240px;
+                    height: 240px;
+                    border-radius: 50%;
+                    background: radial-gradient(circle at 38% 35%, #ffdd88, #c0c0c0);
+                    box-shadow: 0 0 60px 10px rgba(200,200,200,0.3);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin-bottom: 36px;
+                    transition: background 0.8s ease, box-shadow 0.8s ease;
+                ">
+                    <span id="vibeLevelText" style="font-size: 1.6em; font-weight: 800; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,0.4); letter-spacing: 0.05em;">—</span>
+                </div>
+
+                <div id="crowdList" style="width: 100%; max-width: 360px; margin-top: 8px;"></div>
+
+                <div id="vibeError" style="color: #e94560; font-size: 0.9em; margin-top: 16px; display: none;"></div>
+            </div>
+
+            <!-- Right sidebar toggle button -->
+            <div style="position: relative;">
+                <button onclick="toggleVibeSidebar()" title="Toggle settings" style="
+                    position: absolute;
+                    top: 16px;
+                    left: -16px;
+                    width: 28px;
+                    height: 28px;
+                    background: #1e1e3a;
+                    border: 1px solid #2a2a4a;
+                    border-radius: 50%;
+                    color: #888;
+                    font-size: 14px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 10;
+                    transition: color 0.2s;
+                " onmouseover="this.style.color='#e94560'" onmouseout="this.style.color='#888'">⚙</button>
+            </div>
+
+            <!-- Right sidebar controls -->
+            <div id="vibeSidebar" style="width: 0px; padding: 0; opacity: 0; display: flex; flex-direction: column; gap: 28px; border-left: 1px solid #1e1e3a; overflow: hidden; transition: width 0.25s ease, padding 0.25s ease, opacity 0.2s ease;">
+
+                <div>
+                    <div style="font-size: 0.75em; color: #666; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;">Vibe Time</div>
+                    <input type="text" id="vibeTime" placeholder="Now" readonly style="
+                        width: 100%;
+                        background: #16213e;
+                        color: #eee;
+                        border: 1px solid #2a2a4a;
+                        border-radius: 5px;
+                        padding: 6px 8px;
+                        font-size: 0.85em;
+                        cursor: pointer;
+                    ">
+                </div>
+
+                <div>
+                    <div style="font-size: 0.75em; color: #666; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;">Vibe History</div>
+                    <input type="range" id="vibeHistory" min="1" max="6" value="3"
+                           oninput="document.getElementById('vibeHistoryVal').textContent = this.value"
+                           style="width: 100%; accent-color: #e94560; cursor: pointer;">
+                    <div style="display: flex; justify-content: space-between; margin-top: 4px;">
+                        <span style="font-size: 0.75em; color: #444;">1</span>
+                        <span id="vibeHistoryVal" style="font-size: 0.85em; color: #e94560; font-weight: 600;">3</span>
+                        <span style="font-size: 0.75em; color: #444;">6</span>
+                    </div>
+                </div>
+
+                <div>
+                    <div style="font-size: 0.75em; color: #666; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;">Vibe Interval</div>
+                    <select id="vibeInterval" onchange="startCrowdTimer()" style="
+                        width: 100%;
+                        background: #16213e;
+                        color: #eee;
+                        border: 1px solid #2a2a4a;
+                        border-radius: 5px;
+                        padding: 6px 8px;
+                        font-size: 0.85em;
+                        cursor: pointer;
+                    ">
+                        <option value="1">1 sec</option>
+                        <option value="5">5 sec</option>
+                        <option value="10">10 sec</option>
+                        <option value="30">30 sec</option>
+                        <option value="60">1 min</option>
+                        <option value="120">2 min</option>
+                        <option value="300" selected>5 min</option>
+                        <option value="600">10 min</option>
+                    </select>
+                </div>
+
+                <div>
+                    <div style="font-size: 0.75em; color: #666; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;">Model</div>
+                    <select id="vibeModel" style="
+                        width: 100%;
+                        background: #16213e;
+                        color: #eee;
+                        border: 1px solid #2a2a4a;
+                        border-radius: 5px;
+                        padding: 6px 8px;
+                        font-size: 0.85em;
+                        cursor: pointer;
+                    ">
+                        <option value="">Loading...</option>
+                    </select>
+                </div>
+
+                <div>
+                    <div style="font-size: 0.75em; color: #666; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px;">View</div>
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9em; color: #ccc;">
+                            <input type="radio" name="vibeView" value="below" checked style="accent-color: #e94560;"> Below
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9em; color: #ccc;">
+                            <input type="radio" name="vibeView" value="north" style="accent-color: #e94560;"> North
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9em; color: #ccc;">
+                            <input type="radio" name="vibeView" value="east" style="accent-color: #e94560;"> East
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9em; color: #ccc;">
+                            <input type="radio" name="vibeView" value="south" style="accent-color: #e94560;"> South
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9em; color: #ccc;">
+                            <input type="radio" name="vibeView" value="west" style="accent-color: #e94560;"> West
+                        </label>
+                    </div>
+                </div>
+
+                <button onclick="loadCrowd(); startCrowdTimer();" style="
+                    background: #e94560;
+                    color: #fff;
+                    border: none;
+                    border-radius: 6px;
+                    padding: 10px;
+                    font-size: 0.95em;
+                    font-weight: 600;
+                    cursor: pointer;
+                    width: 100%;
+                    margin-top: auto;
+                ">Get Crowd</button>
+
+            </div>
+        </div>
+    </div>
+
     <!-- Modal for unwarped images -->
     <div class="modal-overlay" id="unwarpedModal">
         <div class="modal-content">
@@ -1371,6 +1582,27 @@
             </div>
             <div class="modal-body">
                 <div class="unwarped-grid" id="unwarpedGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Crowd image modal -->
+    <div class="modal-overlay" id="crowdModal" onclick="if(event.target===this) closeCrowdModal()">
+        <div class="modal-content" style="max-width: 900px;" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-nav">
+                    <button class="nav-arrow" id="crowdPrevBtn" onclick="navigateCrowd(-1)" title="Previous (Left Arrow)">&#9664;</button>
+                    <span class="image-counter" id="crowdCounter"></span>
+                    <button class="nav-arrow" id="crowdNextBtn" onclick="navigateCrowd(1)" title="Next (Right Arrow)">&#9654;</button>
+                </div>
+                <h3 id="crowdModalTitle" style="font-size:1em; color:#aaa; font-weight:400;"></h3>
+                <button class="modal-close" onclick="closeCrowdModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 0;">
+                <div style="background:#0a0a1a; text-align:center; min-height:300px; display:flex; align-items:center; justify-content:center;">
+                    <img id="crowdModalImg" src="" alt="" style="max-width:100%; max-height:60vh; object-fit:contain;">
+                </div>
+                <div id="crowdModalAnalysis" style="padding: 20px 25px; border-top: 1px solid #0f3460;"></div>
             </div>
         </div>
     </div>
@@ -1411,6 +1643,102 @@
         let currentFullscreenIndex = -1;
         let fullscreenContext = 'explorer'; // 'explorer' or 'process'
         let selectedImages = []; // Array of {url, label, imageKey, filename, s3Key}
+        let currentBucket = '';
+
+        function bucketParam(sep = '?') {
+            return currentBucket ? `${sep}bucket=${encodeURIComponent(currentBucket)}` : '';
+        }
+
+        function bucketAppend(url) {
+            // Append bucket param to any URL that may already have query params
+            if (!currentBucket) return url;
+            return url + (url.includes('?') ? '&' : '?') + `bucket=${encodeURIComponent(currentBucket)}`;
+        }
+
+        async function loadAccounts(selectBucket = null) {
+            const select = document.getElementById('accountSelect');
+            try {
+                const resp = await fetch('/api/accounts');
+                const data = await resp.json();
+                currentBucket = selectBucket || data.default || '';
+                select.innerHTML = '';
+                data.accounts.forEach(a => {
+                    const opt = document.createElement('option');
+                    opt.value = a.bucket;
+                    opt.textContent = a.account;
+                    opt.selected = a.bucket === currentBucket;
+                    select.appendChild(opt);
+                });
+            } catch (e) {
+                select.innerHTML = '';
+            }
+            // Always append the create sentinel at the bottom
+            const sentinel = document.createElement('option');
+            sentinel.value = '__create__';
+            sentinel.textContent = '+ Create account';
+            sentinel.style.color = '#e94560';
+            select.appendChild(sentinel);
+        }
+
+        function onAccountChange() {
+            const select = document.getElementById('accountSelect');
+            if (select.value === '__create__') {
+                // Revert selection to current bucket, show creation UI
+                select.value = currentBucket;
+                showCreateAccount();
+                return;
+            }
+            currentBucket = select.value;
+            const activeTab = document.querySelector('.tab.active');
+            if (activeTab) {
+                const tab = activeTab.dataset.tab;
+                if (tab === 'explorer') loadStats();
+                if (tab === 'results') { loadResultStats(); loadAllResults(); }
+            }
+        }
+
+        function showCreateAccount() {
+            const banner = document.getElementById('createAccountBanner');
+            const input = document.getElementById('newAccountName');
+            document.getElementById('createAccountError').textContent = '';
+            document.getElementById('newAccountPreview').textContent = '…';
+            input.value = '';
+            banner.style.display = 'block';
+            input.focus();
+            input.oninput = () => {
+                document.getElementById('newAccountPreview').textContent = input.value.trim().toLowerCase() || '…';
+            };
+        }
+
+        function cancelCreateAccount() {
+            document.getElementById('createAccountBanner').style.display = 'none';
+        }
+
+        async function submitCreateAccount() {
+            const input = document.getElementById('newAccountName');
+            const errorEl = document.getElementById('createAccountError');
+            const account = input.value.trim().toLowerCase();
+            errorEl.textContent = '';
+            if (!account) { errorEl.textContent = 'Enter a name.'; return; }
+
+            try {
+                const resp = await fetch('/api/accounts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ account }),
+                });
+                const data = await resp.json();
+                if (!resp.ok) { errorEl.textContent = data.detail || 'Error creating account.'; return; }
+
+                cancelCreateAccount();
+                await loadAccounts(data.bucket);
+                currentBucket = data.bucket;
+                const activeTab = document.querySelector('.tab.active');
+                if (activeTab && activeTab.dataset.tab === 'explorer') loadStats();
+            } catch (e) {
+                errorEl.textContent = 'Request failed: ' + e.message;
+            }
+        }
 
         // Tab switching
         document.querySelectorAll('.tab').forEach(tab => {
@@ -1429,6 +1757,10 @@
                 // Update process tab when switching to it
                 if (tab.dataset.tab === 'process') {
                     renderProcessTab();
+                }
+
+                if (tab.dataset.tab === 'vibe') {
+                    initVibeTab();
                 }
             });
         });
@@ -1535,7 +1867,7 @@
         // Load stats and histogram on page load
         async function loadStats() {
             try {
-                const response = await fetch('/api/stats');
+                const response = await fetch(bucketAppend('/api/stats'));
                 statsData = await response.json();
 
                 // Check if there's an error in the response
@@ -1843,7 +2175,7 @@
                     from_time: fromTime,
                     to_time: toTime
                 });
-                const response = await fetch(`/api/images?${params}`);
+                const response = await fetch(bucketAppend(`/api/images?${params}`));
                 const data = await response.json();
 
                 currentImages = data.images;
@@ -1890,7 +2222,7 @@
         async function checkUnwarpedStatus(images) {
             const keys = images.map(img => img.key);
             try {
-                const response = await fetch('/api/unwarped-status', {
+                const response = await fetch(bucketAppend('/api/unwarped-status'), {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({image_keys: keys})
@@ -1936,7 +2268,7 @@
             modal.classList.add('show');
 
             try {
-                const response = await fetch(`/api/unwarped?image_key=${encodeURIComponent(imageKey)}`);
+                const response = await fetch(bucketAppend(`/api/unwarped?image_key=${encodeURIComponent(imageKey)}`));
                 const data = await response.json();
 
                 const directions = ['north', 'east', 'south', 'west', 'below'];
@@ -2065,7 +2397,7 @@
             grid.innerHTML = '<div class="empty-state"><div class="spinner"></div> Unwarping...</div>';
 
             try {
-                const response = await fetch(`/api/unwarp?image_key=${encodeURIComponent(currentImageKey)}`, {
+                const response = await fetch(bucketAppend(`/api/unwarp?image_key=${encodeURIComponent(currentImageKey)}`), {
                     method: 'POST'
                 });
 
@@ -2114,7 +2446,7 @@
             unwarpStatus.innerHTML = '<div class="spinner"></div> Rotating...';
 
             try {
-                const response = await fetch(`/api/rotate?image_key=${encodeURIComponent(imageKey)}&angle=${angle}`, {
+                const response = await fetch(bucketAppend(`/api/rotate?image_key=${encodeURIComponent(imageKey)}&angle=${angle}`), {
                     method: 'POST'
                 });
 
@@ -2140,7 +2472,7 @@
             unwarpStatus.innerHTML = '<div class="spinner"></div> Removing rotation...';
 
             try {
-                const response = await fetch(`/api/rotated?image_key=${encodeURIComponent(imageKey)}`, {
+                const response = await fetch(bucketAppend(`/api/rotated?image_key=${encodeURIComponent(imageKey)}`), {
                     method: 'DELETE'
                 });
 
@@ -2177,7 +2509,7 @@
             status.innerHTML = 'Rotating...';
 
             try {
-                const response = await fetch(`/api/rotate?image_key=${encodeURIComponent(currentImage.s3Key)}&angle=${angle}`, {
+                const response = await fetch(bucketAppend(`/api/rotate?image_key=${encodeURIComponent(currentImage.s3Key)}&angle=${angle}`), {
                     method: 'POST'
                 });
 
@@ -2189,7 +2521,7 @@
                 status.textContent = 'Done!';
 
                 // Fetch new rotated URL and update fullscreen image in-place
-                const urlResp = await fetch(`/api/image-url?key=${encodeURIComponent(currentImage.s3Key.replace('.jpg', '_rotated.jpg'))}`);
+                const urlResp = await fetch(bucketAppend(`/api/image-url?key=${encodeURIComponent(currentImage.s3Key.replace('.jpg', '_rotated.jpg'))}`));
                 if (urlResp.ok) {
                     const urlData = await urlResp.json();
                     document.getElementById('fullscreenImg').src = urlData.url;
@@ -2215,7 +2547,7 @@
             status.innerHTML = 'Removing...';
 
             try {
-                const response = await fetch(`/api/rotated?image_key=${encodeURIComponent(currentImage.s3Key)}`, {
+                const response = await fetch(bucketAppend(`/api/rotated?image_key=${encodeURIComponent(currentImage.s3Key)}`), {
                     method: 'DELETE'
                 });
 
@@ -2227,7 +2559,7 @@
                 status.textContent = 'Done!';
 
                 // Fetch original (non-rotated) URL and update fullscreen image in-place
-                const urlResp = await fetch(`/api/image-url?key=${encodeURIComponent(currentImage.s3Key)}`);
+                const urlResp = await fetch(bucketAppend(`/api/image-url?key=${encodeURIComponent(currentImage.s3Key)}`));
                 if (urlResp.ok) {
                     const urlData = await urlResp.json();
                     document.getElementById('fullscreenImg').src = urlData.url;
@@ -2790,7 +3122,7 @@
 
         async function loadResultStats() {
             try {
-                const response = await fetch('/api/result-stats');
+                const response = await fetch(bucketAppend('/api/result-stats'));
                 resultsStatsData = await response.json();
 
                 if (resultsStatsData.error) {
@@ -3051,7 +3383,7 @@
         }
 
         async function loadResultsWithFilters() {
-            await fetchResults('/api/results');
+            await fetchResults(bucketAppend('/api/results'));
         }
 
         async function viewResultsInExplorer(fromDate, fromTime, toDate, toTime) {
@@ -3111,7 +3443,7 @@
                     for (const result of results) {
                         try {
                             // Fetch result JSON
-                            const resultResponse = await fetch(`/api/result?key=${encodeURIComponent(result.key)}`);
+                            const resultResponse = await fetch(bucketAppend(`/api/result?key=${encodeURIComponent(result.key)}`));
                             const resultData = await resultResponse.json();
 
                             let passesFilters = true;
@@ -3212,7 +3544,7 @@
             body.classList.add('show');
 
             try {
-                const response = await fetch(`/api/result?key=${encodeURIComponent(key)}`);
+                const response = await fetch(bucketAppend(`/api/result?key=${encodeURIComponent(key)}`));
                 const data = await response.json();
 
                 // Store data for download
@@ -3446,55 +3778,55 @@
         document.addEventListener('keydown', (e) => {
             const modal = document.getElementById('unwarpedModal');
             const fullscreen = document.getElementById('fullscreenViewer');
+            const crowdModal = document.getElementById('crowdModal');
 
             if (e.key === 'Escape') {
-                // Close fullscreen first if it's open, otherwise close modal
                 if (fullscreen.classList.contains('show')) {
                     closeFullscreen();
+                } else if (crowdModal.classList.contains('show')) {
+                    closeCrowdModal();
                 } else {
                     closeModal();
                 }
             }
 
+            if (crowdModal.classList.contains('show')) {
+                if (e.key === 'ArrowLeft') navigateCrowd(-1);
+                else if (e.key === 'ArrowRight') navigateCrowd(1);
+            }
             // Navigation with arrow keys in fullscreen mode
-            if (fullscreen.classList.contains('show')) {
-                if (e.key === 'ArrowLeft') {
-                    navigateFullscreen(-1);
-                } else if (e.key === 'ArrowRight') {
-                    navigateFullscreen(1);
-                }
+            else if (fullscreen.classList.contains('show')) {
+                if (e.key === 'ArrowLeft') navigateFullscreen(-1);
+                else if (e.key === 'ArrowRight') navigateFullscreen(1);
             }
             // Navigation with arrow keys when modal is open (but fullscreen is not)
             else if (modal.classList.contains('show')) {
-                if (e.key === 'ArrowLeft') {
-                    navigateImage(-1);
-                } else if (e.key === 'ArrowRight') {
-                    navigateImage(1);
-                }
+                if (e.key === 'ArrowLeft') navigateImage(-1);
+                else if (e.key === 'ArrowRight') navigateImage(1);
             }
         });
 
         // Load available models for dropdown
         async function loadModels() {
-            const select = document.getElementById('processModel');
+            const selects = ['processModel', 'vibeModel'].map(id => document.getElementById(id)).filter(Boolean);
             try {
                 const response = await fetch('/api/models');
                 if (!response.ok) throw new Error('Failed to load models');
                 const data = await response.json();
 
-                select.innerHTML = '';
-                data.models.forEach(model => {
-                    const option = document.createElement('option');
-                    option.value = model.id;
-                    option.textContent = `${model.id} - ${model.description || ''}`;
-                    if (model.id === data.default) {
-                        option.selected = true;
-                    }
-                    select.appendChild(option);
+                selects.forEach(select => {
+                    select.innerHTML = '';
+                    data.models.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model.id;
+                        option.textContent = `${model.id} - ${model.description || ''}`;
+                        if (model.id === data.default) option.selected = true;
+                        select.appendChild(option);
+                    });
                 });
             } catch (error) {
                 console.error('Error loading models:', error);
-                select.innerHTML = '<option value="">Failed to load models</option>';
+                selects.forEach(select => { select.innerHTML = '<option value="">Failed to load models</option>'; });
             }
         }
 
@@ -3647,9 +3979,247 @@
             }
         }
 
+        // Crowd tab
+        const CROWD_LEVEL_COLORS = {
+            low:    { from: '#ffe066', to: '#f7a800', glow: 'rgba(247,168,0,0.35)' },
+            medium: { from: '#ffaa44', to: '#e05c00', glow: 'rgba(224,92,0,0.4)' },
+            high:   { from: '#ff6644', to: '#c0001a', glow: 'rgba(192,0,26,0.45)' },
+        };
+
+        function applyCrowdBallColor(level) {
+            const ball = document.getElementById('vibeBall');
+            const c = CROWD_LEVEL_COLORS[(level || '').toLowerCase()] || CROWD_LEVEL_COLORS['medium'];
+            ball.style.background = `radial-gradient(circle at 38% 35%, ${c.from}, ${c.to})`;
+            ball.style.boxShadow = `0 0 70px 15px ${c.glow}`;
+        }
+
+        function toggleVibeSidebar() {
+            const sidebar = document.getElementById('vibeSidebar');
+            const collapsed = sidebar.style.width === '0px';
+            if (collapsed) {
+                sidebar.style.width = '200px';
+                sidebar.style.padding = '30px 20px';
+                sidebar.style.opacity = '1';
+            } else {
+                sidebar.style.width = '0px';
+                sidebar.style.padding = '0';
+                sidebar.style.opacity = '0';
+            }
+        }
+
+        let _crowdTimer = null;
+
+        function startCrowdTimer() {
+            if (_crowdTimer) clearInterval(_crowdTimer);
+            const secs = parseInt(document.getElementById('vibeInterval').value) || 300;
+            _crowdTimer = setInterval(() => {
+                if (_vibePicker) _vibePicker.setDate(new Date(), false);
+                loadCrowd();
+            }, secs * 1000);
+        }
+
+        let _vibePicker = null;
+
+        async function initVibeTab() {
+            const account = currentBucket.startsWith('vibecast-') ? currentBucket.slice('vibecast-'.length) : currentBucket;
+            document.getElementById('vibeBarName').textContent = 'Lausanne';
+            document.getElementById('vibeLocation').textContent = account || currentBucket || '—';
+
+            // Fetch available dates (reuse statsData if already loaded, else fetch fresh)
+            let enabledDates = [];
+            try {
+                const resp = await fetch(bucketAppend('/api/stats'));
+                const data = await resp.json();
+                enabledDates = data.dates || [];
+            } catch (e) { /* fall through, all dates enabled */ }
+
+            const now = new Date();
+            const nowStr = now.toISOString().slice(0, 16);
+
+            if (_vibePicker) _vibePicker.destroy();
+            _vibePicker = flatpickr('#vibeTime', {
+                enableTime: true,
+                dateFormat: 'Y-m-dTH:i',
+                altInput: true,
+                altFormat: 'M j, H:i',
+                defaultDate: now,
+                enable: enabledDates.length ? enabledDates : undefined,
+                theme: 'dark',
+                onReady(_, __, fp) {
+                    fp.altInput.style.cssText = `
+                        width: 100%; background: #16213e; color: #eee;
+                        border: 1px solid #2a2a4a; border-radius: 5px;
+                        padding: 6px 8px; font-size: 0.85em; cursor: pointer;`;
+                },
+            });
+
+            loadCrowd();
+            startCrowdTimer();
+        }
+
+        async function loadCrowd() {
+            const errorEl = document.getElementById('vibeError');
+            const listEl = document.getElementById('crowdList');
+            errorEl.style.display = 'none';
+            listEl.innerHTML = '<div style="color:#666; font-size:0.9em; text-align:center;">Loading…</div>';
+
+            const account = currentBucket.startsWith('vibecast-') ? currentBucket.slice('vibecast-'.length) : currentBucket;
+            const rawTs = _vibePicker ? _vibePicker.input.value : document.getElementById('vibeTime').value;
+            const timestamp = rawTs || new Date().toISOString().slice(0, 16);
+            const intervalSecs = parseInt(document.getElementById('vibeInterval').value);
+            const numImages = parseInt(document.getElementById('vibeHistory').value);
+            const modelId = document.getElementById('vibeModel').value || 'gpt-4o';
+            const view = document.querySelector('input[name="vibeView"]:checked')?.value || 'fish';
+
+            try {
+                const resp = await fetch('/api/crowd', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        bucket_suffix: account,
+                        timestamp,
+                        interval_seconds: intervalSecs,
+                        num_images: numImages,
+                        model_id: modelId,
+                        view,
+                    }),
+                });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    throw new Error(err.detail || `Server returned ${resp.status}`);
+                }
+                const results = await resp.json();
+
+                // results is a list, most recent first
+                const items = Array.isArray(results) ? results : (results.results || []);
+
+                if (!items.length) {
+                    listEl.innerHTML = '<div style="color:#666; font-size:0.9em; text-align:center;">No results</div>';
+                    return;
+                }
+
+                // Use the most recent entry to drive the ball
+                const latest = items[0];
+                const crowdedness = latest?.analysis?.crowdedness || '';
+                document.getElementById('vibeLevelText').textContent = crowdedness.toUpperCase() || '—';
+                applyCrowdBallColor(crowdedness);
+
+                // Store for modal navigation
+                crowdModalItems = items;
+
+                // Update "last updated" timestamp
+                const now = new Date();
+                document.getElementById('vibeUpdated').textContent = `Updated ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+
+                // Render the list
+                listEl.innerHTML = items.map((r, i) => {
+                    const ts = r.image_datetime ? r.image_datetime.replace('T', ' ').slice(0, 16) : '—';
+                    const crowd = r?.analysis?.crowdedness || '—';
+                    const isLatest = i === 0;
+                    return `<div style="
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 10px 0;
+                        border-bottom: 1px solid #1e1e3a;
+                        ${isLatest ? 'opacity:1;' : 'opacity:0.6;'}
+                        cursor: pointer;
+                    " onclick="openCrowdImage(${i})">
+                        <span style="font-size:0.85em; color:#888; font-family:monospace;">${ts}</span>
+                        <span style="font-size:0.95em; font-weight:600; color:${crowdColor(crowd)};">${crowd.toUpperCase()}</span>
+                    </div>`;
+                }).join('');
+
+            } catch (err) {
+                listEl.innerHTML = '';
+                errorEl.textContent = err.message;
+                errorEl.style.display = 'block';
+            }
+        }
+
+        function crowdColor(level) {
+            const l = (level || '').toLowerCase();
+            if (l === 'low') return '#f7a800';
+            if (l === 'medium') return '#e05c00';
+            if (l === 'high') return '#e94560';
+            return '#888';
+        }
+
+        let crowdModalItems = [];
+        let crowdModalIndex = 0;
+
+        async function openCrowdImage(index) {
+            crowdModalIndex = index;
+            document.getElementById('crowdModal').classList.add('show');
+            await renderCrowdModal();
+        }
+
+        function closeCrowdModal() {
+            document.getElementById('crowdModal').classList.remove('show');
+        }
+
+        async function navigateCrowd(dir) {
+            const next = crowdModalIndex + dir;
+            if (next < 0 || next >= crowdModalItems.length) return;
+            crowdModalIndex = next;
+            await renderCrowdModal();
+        }
+
+        async function renderCrowdModal() {
+            const r = crowdModalItems[crowdModalIndex];
+            if (!r) return;
+
+            const total = crowdModalItems.length;
+            document.getElementById('crowdCounter').textContent = `${crowdModalIndex + 1} / ${total}`;
+            document.getElementById('crowdPrevBtn').disabled = crowdModalIndex === 0;
+            document.getElementById('crowdNextBtn').disabled = crowdModalIndex === total - 1;
+
+            const ts = r.image_datetime ? r.image_datetime.replace('T', ' ') : '—';
+            document.getElementById('crowdModalTitle').textContent = ts;
+
+            // Load presigned URL
+            const img = document.getElementById('crowdModalImg');
+            img.src = '';
+            try {
+                const resp = await fetch(bucketAppend(`/api/image-url?key=${encodeURIComponent(r.key || '')}`));
+                if (resp.ok) {
+                    const data = await resp.json();
+                    img.src = data.url;
+                }
+            } catch (e) { console.error(e); }
+
+            // Render analysis
+            const a = r.analysis || {};
+            const crowd = a.crowdedness || '—';
+            const level = a.crowdedness_level != null ? a.crowdedness_level : '—';
+            const reasoning = a.reasoning || '';
+            document.getElementById('crowdModalAnalysis').innerHTML = `
+                <div style="display:flex; gap:24px; flex-wrap:wrap; margin-bottom:14px;">
+                    <div>
+                        <div style="font-size:0.7em; color:#555; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:4px;">Crowdedness</div>
+                        <div style="font-size:1.3em; font-weight:700; color:${crowdColor(crowd)};">${crowd.toUpperCase()}</div>
+                    </div>
+                    <div>
+                        <div style="font-size:0.7em; color:#555; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:4px;">Level</div>
+                        <div style="font-size:1.3em; font-weight:700; color:#eee;">${level} / 3</div>
+                    </div>
+                    <div style="flex:1; min-width:200px;">
+                        <div style="font-size:0.7em; color:#555; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:4px;">Model</div>
+                        <div style="font-size:0.85em; color:#888;">${r.model || '—'}</div>
+                    </div>
+                </div>
+                ${reasoning ? `
+                <div>
+                    <div style="font-size:0.7em; color:#555; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:6px;">Reasoning</div>
+                    <div style="font-size:0.9em; color:#ccc; line-height:1.6; background:#0f1a2e; padding:12px 14px; border-radius:6px;">${reasoning}</div>
+                </div>` : ''}
+            `;
+        }
+
         // Initialize
-        loadStats();
+        loadAccounts().then(() => loadStats());
         loadModels();
+        // vibeTime is initialized by flatpickr in initVibeTab()
         loadPrompts();
     </script>
 </body>

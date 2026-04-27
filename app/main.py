@@ -8,6 +8,7 @@ from typing import Any
 
 import boto3
 import httpx
+from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
@@ -183,11 +184,54 @@ async def save_prompt(req: PromptCreate) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/accounts")
+async def list_accounts() -> dict[str, Any]:
+    """List all vibecast S3 accounts (buckets starting with 'vibecast')."""
+    try:
+        accounts = s3_service.list_vibecast_buckets()
+    except Exception:
+        accounts = []
+    default = s3_service.BUCKET_NAME
+    if not accounts:
+        name = default[len("vibecast-"):] if default.startswith("vibecast-") else default
+        accounts = [{"bucket": default, "account": name}]
+    return {"accounts": accounts, "default": default}
+
+
+class CreateAccountRequest(BaseModel):
+    account: str
+
+
+@app.post("/api/accounts")
+async def create_account(req: CreateAccountRequest) -> dict[str, Any]:
+    """Create a new vibecast account by provisioning an S3 bucket."""
+    account = req.account.strip().lower()
+    if not account:
+        raise HTTPException(status_code=400, detail="Account name cannot be empty")
+    if not account.replace("-", "").isalnum():
+        raise HTTPException(status_code=400, detail="Account name may only contain letters, numbers, and hyphens")
+    bucket = f"vibecast-{account}"
+    try:
+        s3 = s3_service.get_s3_client()
+        kwargs: dict[str, Any] = {"Bucket": bucket}
+        if s3_service.AWS_REGION != "us-east-1":
+            kwargs["CreateBucketConfiguration"] = {"LocationConstraint": s3_service.AWS_REGION}
+        s3.create_bucket(**kwargs)
+    except ClientError as e:
+        code = e.response["Error"]["Code"]
+        if code in ("BucketAlreadyOwnedByYou", "BucketAlreadyExists"):
+            pass  # fine, already exists
+        else:
+            raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"bucket": bucket, "account": account}
+
+
 @app.get("/api/stats")
-async def get_stats() -> dict[str, Any]:
+async def get_stats(bucket: str = s3_service.BUCKET_NAME) -> dict[str, Any]:
     """Get image statistics for histogram."""
-    # This now returns error info in the response instead of raising exceptions
-    return s3_service.get_image_stats()
+    return s3_service.get_image_stats(bucket=bucket)
 
 
 @app.get("/api/images")
@@ -197,50 +241,50 @@ async def list_images(
     to_date: str | None = None,
     from_time: str = "00:00",
     to_time: str = "23:59",
+    bucket: str = s3_service.BUCKET_NAME,
 ) -> dict[str, Any]:
     """List images for a date or date range."""
     try:
         if from_date and to_date:
-            images = s3_service.list_images_by_range(from_date, to_date, from_time, to_time)
+            images = s3_service.list_images_by_range(from_date, to_date, from_time, to_time, bucket=bucket)
         elif date:
-            images = s3_service.list_images_by_date(date)
+            images = s3_service.list_images_by_date(date, bucket=bucket)
         else:
             return {"images": [], "count": 0, "error": "date or from_date/to_date required"}
 
-        # Add presigned URLs
         for img in images:
-            img["url"] = s3_service.get_presigned_url(img["key"])
+            img["url"] = s3_service.get_presigned_url(img["key"], bucket=bucket)
         return {"images": images, "count": len(images)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/image-url")
-async def get_image_url(key: str) -> dict[str, str]:
+async def get_image_url(key: str, bucket: str = s3_service.BUCKET_NAME) -> dict[str, str]:
     """Get presigned URL for an image."""
     try:
-        url = s3_service.get_presigned_url(key)
+        url = s3_service.get_presigned_url(key, bucket=bucket)
         return {"url": url}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/unwarped-status")
-async def unwarped_status(request: dict[str, Any]) -> dict[str, Any]:
+async def unwarped_status(request: dict[str, Any], bucket: str = s3_service.BUCKET_NAME) -> dict[str, Any]:
     """Batch check which images have unwarped variants."""
     try:
         image_keys = request.get("image_keys", [])
-        status = s3_service.batch_check_unwarped(image_keys)
+        status = s3_service.batch_check_unwarped(image_keys, bucket=bucket)
         return {"status": status}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/unwarped")
-async def get_unwarped(image_key: str) -> dict[str, Any]:
+async def get_unwarped(image_key: str, bucket: str = s3_service.BUCKET_NAME) -> dict[str, Any]:
     """Get unwarped images for a raw fisheye image."""
     try:
-        unwarped = s3_service.get_unwarped_images(image_key)
+        unwarped = s3_service.get_unwarped_images(image_key, bucket=bucket)
         return {"unwarped": unwarped, "image_key": image_key}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -285,7 +329,7 @@ async def process_image(req: ProcessRequest) -> dict[str, Any]:
 
 
 @app.post("/api/unwarp")
-async def unwarp_image(image_key: str) -> dict[str, Any]:
+async def unwarp_image(image_key: str, bucket: str = s3_service.BUCKET_NAME) -> dict[str, Any]:
     """Unwarp an image via Lambda function (direct invocation).
 
     Args:
@@ -293,9 +337,8 @@ async def unwarp_image(image_key: str) -> dict[str, Any]:
     """
     try:
         # Convert image key to S3 URI
-        s3_uri = s3_service.get_s3_uri(image_key)
+        s3_uri = s3_service.get_s3_uri(image_key, bucket=bucket)
 
-        # Invoke Lambda function directly
         lambda_client = boto3.client('lambda', region_name=s3_service.AWS_REGION)
 
         payload = {
@@ -349,7 +392,7 @@ async def unwarp_image(image_key: str) -> dict[str, Any]:
 
 
 @app.post("/api/rotate")
-async def rotate_image(image_key: str, angle: float) -> dict[str, Any]:
+async def rotate_image(image_key: str, angle: float, bucket: str = s3_service.BUCKET_NAME) -> dict[str, Any]:
     """Rotate an unwarped image by a given angle via Lambda.
 
     Args:
@@ -357,7 +400,7 @@ async def rotate_image(image_key: str, angle: float) -> dict[str, Any]:
         angle: Rotation angle in degrees clockwise
     """
     try:
-        s3_uri = s3_service.get_s3_uri(image_key)
+        s3_uri = s3_service.get_s3_uri(image_key, bucket=bucket)
 
         lambda_client = boto3.client('lambda', region_name=s3_service.AWS_REGION)
 
@@ -398,7 +441,7 @@ async def rotate_image(image_key: str, angle: float) -> dict[str, Any]:
 
 
 @app.delete("/api/rotated")
-async def delete_rotated_image(image_key: str) -> dict[str, Any]:
+async def delete_rotated_image(image_key: str, bucket: str = s3_service.BUCKET_NAME) -> dict[str, Any]:
     """Delete the rotated variant of an unwarped image.
 
     Args:
@@ -409,7 +452,7 @@ async def delete_rotated_image(image_key: str) -> dict[str, Any]:
         rotated_key = f"{name_without_ext}_rotated.{ext}"
 
         s3 = s3_service.get_s3_client()
-        s3.delete_object(Bucket=s3_service.BUCKET_NAME, Key=rotated_key)
+        s3.delete_object(Bucket=bucket, Key=rotated_key)
 
         return {"deleted": rotated_key}
 
@@ -423,29 +466,29 @@ async def delete_rotated_image(image_key: str) -> dict[str, Any]:
 
 
 @app.get("/api/result-stats")
-async def get_result_stats() -> dict[str, Any]:
+async def get_result_stats(bucket: str = s3_service.BUCKET_NAME) -> dict[str, Any]:
     """Get result statistics for histograms."""
-    return s3_service.get_result_stats()
+    return s3_service.get_result_stats(bucket=bucket)
 
 
 @app.get("/api/results")
-async def list_results(date: str | None = None) -> dict[str, Any]:
+async def list_results(date: str | None = None, bucket: str = s3_service.BUCKET_NAME) -> dict[str, Any]:
     """List result files, optionally filtered by date."""
     try:
         if date:
-            results = s3_service.list_results_by_date(date)
+            results = s3_service.list_results_by_date(date, bucket=bucket)
         else:
-            results = s3_service.list_all_results()
+            results = s3_service.list_all_results(bucket=bucket)
         return {"results": results, "count": len(results)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/result")
-async def get_result(key: str) -> dict[str, Any]:
+async def get_result(key: str, bucket: str = s3_service.BUCKET_NAME) -> dict[str, Any]:
     """Get result JSON content."""
     try:
-        content = s3_service.get_result_content(key)
+        content = s3_service.get_result_content(key, bucket=bucket)
         if content is None:
             raise HTTPException(status_code=404, detail="Result not found")
         return content
@@ -453,6 +496,41 @@ async def get_result(key: str) -> dict[str, Any]:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class CrowdRequest(BaseModel):
+    bucket_suffix: str
+    timestamp: str
+    interval_seconds: int = 60
+    num_images: int = 3
+    model_id: str = "gpt-4o"
+    view: str = "fish"
+
+
+@app.post("/api/crowd")
+async def get_crowd(req: CrowdRequest) -> Any:
+    """Call the Lambda crowd insights endpoint."""
+    url = f"{LAMBDA_API_BASE}/insights/crowd"
+    payload = {
+        "bucket_suffix": req.bucket_suffix,
+        "timestamp": req.timestamp,
+        "interval_seconds": req.interval_seconds,
+        "num_images": req.num_images,
+        "model_id": req.model_id,
+        "view": req.view,
+    }
+    async with httpx.AsyncClient(timeout=120) as client:
+        try:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            if "body" in data and isinstance(data["body"], str):
+                return json.loads(data["body"])
+            return data
+        except httpx.HTTPStatusError as e:
+            raise HTTPException(status_code=e.response.status_code, detail=e.response.text)
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=str(e))
 
 
 # ============================================================================
