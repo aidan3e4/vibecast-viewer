@@ -26,37 +26,6 @@
         .flatpickr-next-month:hover svg, .flatpickr-prev-month:hover svg { fill: #e94560 !important; }
     </style>
     <style>
-        .au-tooltip {
-            visibility: hidden;
-            opacity: 0;
-            background: #2a2a4a;
-            color: #ccc;
-            font-size: 0.75em;
-            white-space: nowrap;
-            padding: 4px 8px;
-            border-radius: 5px;
-            border: 1px solid #3a3a5a;
-            position: absolute;
-            bottom: calc(100% + 6px);
-            right: 0;
-            pointer-events: none;
-            transition: opacity 0.15s;
-            z-index: 100;
-        }
-        .au-tooltip::after {
-            content: '';
-            position: absolute;
-            top: 100%;
-            right: 13px;
-            border: 5px solid transparent;
-            border-top-color: #3a3a5a;
-        }
-        div:hover > .au-tooltip {
-            visibility: visible;
-            opacity: 1;
-        }
-    </style>
-    <style>
         * {
             margin: 0;
             padding: 0;
@@ -1440,20 +1409,17 @@
                 display: none;
                 font-size: 0.78em; color: #e94560; font-style: italic;
             ">auto update off after 3 updates</span>
-            <div style="position: relative; display: inline-block;">
-                <button id="autoUpdateBtn" onclick="toggleAutoUpdate()" style="
-                    position: relative; width: 44px; height: 24px;
-                    background: #2a2a4a; border: none; border-radius: 12px;
-                    cursor: pointer; transition: background 0.2s; padding: 0;
-                ">
-                    <span id="autoUpdateKnob" style="
-                        position: absolute; top: 3px; left: 3px;
-                        width: 18px; height: 18px; border-radius: 50%;
-                        background: #555; transition: left 0.2s, background 0.2s;
-                    "></span>
-                </button>
-                <span class="au-tooltip">turns off after 3 auto-updates</span>
-            </div>
+            <button id="autoUpdateBtn" onclick="toggleAutoUpdate()" title="Auto-updates will turn off after 3 updates" style="
+                position: relative; width: 44px; height: 24px;
+                background: #2a2a4a; border: none; border-radius: 12px;
+                cursor: pointer; transition: background 0.2s; padding: 0;
+            ">
+                <span id="autoUpdateKnob" style="
+                    position: absolute; top: 3px; left: 3px;
+                    width: 18px; height: 18px; border-radius: 50%;
+                    background: #555; transition: left 0.2s, background 0.2s;
+                "></span>
+            </button>
         </div>
         <div style="display: flex; min-height: 60vh; background: #12121f;">
 
@@ -4221,24 +4187,22 @@
                 // Store for modal: array of { ts, summary (dict), results }
                 crowdEntries = entries.map(([ts, val]) => ({
                     ts,
-                    summary: (val.summary != null) ? val.summary : {},
+                    summary: val.summary || {},
                     results: val.results || [],
                 }));
-
-                console.log('[crowd] entries:', crowdEntries.map(e => ({ ts: e.ts, summary: e.summary })));
 
                 // summary is now a dict: { crowd_level: int, crowd: str }
                 const latest = crowdEntries[0].summary;
                 const latestCrowd = typeof latest === 'object' ? (latest.crowd || '—') : (latest || '—');
-                const latestLevel = typeof latest === 'object' ? (latest.crowd_level != null ? Number(latest.crowd_level) : null) : null;
+                const latestLevel = typeof latest === 'object' ? (latest.crowd_level ?? null) : null;
 
                 document.getElementById('vibeLevelText').textContent = latestCrowd.toUpperCase();
                 applyCrowdBallColor(latestCrowd);
 
                 // Overall trend: latest vs oldest
                 const oldest = crowdEntries[crowdEntries.length - 1].summary;
-                const oldestLevel = typeof oldest === 'object' ? (oldest.crowd_level != null ? Number(oldest.crowd_level) : null) : null;
-                const overallTrend = trendArrow(latestLevel, oldestLevel);
+                const oldestLevel = typeof oldest === 'object' ? (oldest.crowd_level ?? null) : null;
+                const overallTrend = trendArrow(latestLevel, oldestLevel, true); // latest is newer
                 document.getElementById('vibeTrendText').textContent = overallTrend.arrow;
                 document.getElementById('vibeTrendText').style.color = overallTrend.color;
 
@@ -4246,9 +4210,8 @@
                 const momentum = crowdEntries.length > 1
                     ? (() => {
                         const prev = crowdEntries[1].summary;
-                        const prevLevel = typeof prev === 'object' ? (prev.crowd_level != null ? Number(prev.crowd_level) : null) : null;
-                        console.log('[crowd] momentum: latest=', latestLevel, 'prev=', prevLevel);
-                        return trendArrow(latestLevel, prevLevel);
+                        const prevLevel = typeof prev === 'object' ? (prev.crowd_level ?? null) : null;
+                        return trendArrow(latestLevel, prevLevel, true);
                     })()
                     : { arrow: '—', color: '#888' };
                 document.getElementById('vibeMomentum').textContent = momentum.arrow;
@@ -4268,8 +4231,8 @@
                     const next = crowdEntries[i + 1];
                     let arrow = '', arrowColor = '#888';
                     if (next) {
-                        const nextLevel = typeof next.summary === 'object' ? (next.summary.crowd_level != null ? Number(next.summary.crowd_level) : null) : null;
-                        const t = trendArrow(level, nextLevel);
+                        const nextLevel = typeof next.summary === 'object' ? (next.summary.crowd_level ?? null) : null;
+                        const t = trendArrow(level, nextLevel, true);
                         arrow = t.arrow; arrowColor = t.color;
                     }
                     return `<div style="
@@ -4295,12 +4258,12 @@
         }
 
         // newerLevel is the more recent value; olderLevel is the earlier value
-        // Returns { arrow, color }
-        function trendArrow(newerLevel, olderLevel) {
+        // Returns { arrow, color } where arrow is ↑ / → / ↓
+        function trendArrow(newerLevel, olderLevel, _unused) {
             if (newerLevel === null || olderLevel === null) return { arrow: '—', color: '#888' };
             if (newerLevel > olderLevel) return { arrow: '↑', color: '#4caf50' };
             if (newerLevel < olderLevel) return { arrow: '↓', color: '#e94560' };
-            return { arrow: '➔', color: '#f7a800' };
+            return { arrow: '→', color: '#f7a800' };
         }
 
         function crowdColor(level) {
@@ -4319,58 +4282,3 @@
             if (!entry) return;
 
             document.getElementById('crowdModalTitle').textContent = entry.ts.replace('T', ' ').slice(0, 16);
-            document.getElementById('crowdModalSummary').innerHTML =
-                `<span style="color:${crowdColor(entry.summary)};">${entry.summary.toUpperCase()}</span>`;
-
-            const body = document.getElementById('crowdModalBody');
-            body.innerHTML = '<div style="padding:20px; color:#666; text-align:center;">Loading images…</div>';
-            document.getElementById('crowdModal').classList.add('show');
-
-            // Fetch all presigned URLs in parallel
-            const resultHtmls = await Promise.all(entry.results.map(async (r) => {
-                let imgSrc = '';
-                try {
-                    const resp = await fetch(bucketAppend(`/api/image-url?key=${encodeURIComponent(r.key || '')}`));
-                    if (resp.ok) imgSrc = (await resp.json()).url;
-                } catch (e) {}
-
-                const a = r.analysis || {};
-                const crowd = a.crowdedness || '—';
-                const level = a.crowdedness_level != null ? a.crowdedness_level : '—';
-                const reasoning = a.reasoning || '';
-                const view = (r.key || '').split('_').pop().replace('.jpg', '');
-
-                return `<div style="border-bottom: 1px solid #0f3460; padding: 0 0 24px 0; margin-bottom: 0;">
-                    <div style="background:#0a0a1a; text-align:center;">
-                        ${imgSrc ? `<img src="${imgSrc}" alt="" style="max-width:100%; max-height:50vh; object-fit:contain; display:block; margin:0 auto;">` : '<div style="padding:40px;color:#444;">No image</div>'}
-                    </div>
-                    <div style="padding: 16px 20px;">
-                        <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:10px; align-items:center;">
-                            <div style="font-size:0.7em; color:#555; text-transform:uppercase; letter-spacing:0.08em;">${view}</div>
-                            <div style="font-size:1.1em; font-weight:700; color:${crowdColor(crowd)};">${crowd.toUpperCase()}</div>
-                            <div style="font-size:0.9em; color:#666;">${level} / 3</div>
-                            <div style="font-size:0.75em; color:#444; margin-left:auto;">${r.model || ''}</div>
-                        </div>
-                        ${reasoning ? `<div style="font-size:0.85em; color:#999; line-height:1.5; background:#0f1a2e; padding:10px 12px; border-radius:5px;">${reasoning}</div>` : ''}
-                    </div>
-                </div>`;
-            }));
-
-            body.innerHTML = resultHtmls.join('');
-        }
-
-        function closeCrowdModal() {
-            document.getElementById('crowdModal').classList.remove('show');
-        }
-
-        // Keep keyboard Escape working; remove old nav functions no longer needed
-        async function navigateCrowd() {}
-
-        // Initialize
-        loadAccounts().then(() => loadStats());
-        window._modelsReady = loadModels();
-        // vibeTime is initialized by flatpickr in initVibeTab()
-        loadPrompts();
-    </script>
-</body>
-</html>

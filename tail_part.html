@@ -1,0 +1,53 @@
+
+            const body = document.getElementById('crowdModalBody');
+            body.innerHTML = '<div style="padding:20px; color:#666; text-align:center;">Loading images…</div>';
+            document.getElementById('crowdModal').classList.add('show');
+
+            // Fetch all presigned URLs in parallel
+            const resultHtmls = await Promise.all(entry.results.map(async (r) => {
+                let imgSrc = '';
+                try {
+                    const resp = await fetch(bucketAppend(`/api/image-url?key=${encodeURIComponent(r.key || '')}`));
+                    if (resp.ok) imgSrc = (await resp.json()).url;
+                } catch (e) {}
+
+                const a = r.analysis || {};
+                const crowd = a.crowdedness || '—';
+                const level = a.crowdedness_level != null ? a.crowdedness_level : '—';
+                const reasoning = a.reasoning || '';
+                const view = (r.key || '').split('_').pop().replace('.jpg', '');
+
+                return `<div style="border-bottom: 1px solid #0f3460; padding: 0 0 24px 0; margin-bottom: 0;">
+                    <div style="background:#0a0a1a; text-align:center;">
+                        ${imgSrc ? `<img src="${imgSrc}" alt="" style="max-width:100%; max-height:50vh; object-fit:contain; display:block; margin:0 auto;">` : '<div style="padding:40px;color:#444;">No image</div>'}
+                    </div>
+                    <div style="padding: 16px 20px;">
+                        <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:10px; align-items:center;">
+                            <div style="font-size:0.7em; color:#555; text-transform:uppercase; letter-spacing:0.08em;">${view}</div>
+                            <div style="font-size:1.1em; font-weight:700; color:${crowdColor(crowd)};">${crowd.toUpperCase()}</div>
+                            <div style="font-size:0.9em; color:#666;">${level} / 3</div>
+                            <div style="font-size:0.75em; color:#444; margin-left:auto;">${r.model || ''}</div>
+                        </div>
+                        ${reasoning ? `<div style="font-size:0.85em; color:#999; line-height:1.5; background:#0f1a2e; padding:10px 12px; border-radius:5px;">${reasoning}</div>` : ''}
+                    </div>
+                </div>`;
+            }));
+
+            body.innerHTML = resultHtmls.join('');
+        }
+
+        function closeCrowdModal() {
+            document.getElementById('crowdModal').classList.remove('show');
+        }
+
+        // Keep keyboard Escape working; remove old nav functions no longer needed
+        async function navigateCrowd() {}
+
+        // Initialize
+        loadAccounts().then(() => loadStats());
+        window._modelsReady = loadModels();
+        // vibeTime is initialized by flatpickr in initVibeTab()
+        loadPrompts();
+    </script>
+</body>
+</html>

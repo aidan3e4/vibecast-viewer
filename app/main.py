@@ -504,7 +504,7 @@ class CrowdRequest(BaseModel):
     interval_seconds: int = 60
     num_images: int = 3
     model_id: str = "gpt-4o"
-    view: str = "fish"
+    views: list[str] = ["below", "north", "east", "south", "west"]
 
 
 @app.post("/api/crowd")
@@ -517,7 +517,7 @@ async def get_crowd(req: CrowdRequest) -> Any:
         "interval_seconds": req.interval_seconds,
         "num_images": req.num_images,
         "model_id": req.model_id,
-        "view": req.view,
+        "views": req.views,
     }
     async with httpx.AsyncClient(timeout=120) as client:
         try:
