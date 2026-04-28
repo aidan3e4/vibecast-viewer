@@ -6,6 +6,8 @@
     <title>Vibecast Viewer</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <style>
@@ -1111,8 +1113,12 @@
                     <div class="stat-label">Date Range</div>
                 </div>
             </div>
-            <div id="histogramContainer" style="margin-top: 20px;">
-                <canvas id="histogram" height="200"></canvas>
+            <div id="histogramContainer" style="margin-top: 20px; position: relative; height: 200px;">
+                <canvas id="histogram" style="cursor: crosshair;"></canvas>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+                    <span style="font-size: 0.75em; color: #555;">Drag to select a date range · Click a bar for a single day</span>
+                    <button id="histogramResetBtn" onclick="resetHistogramSelection()" style="display:none; background:none; border:1px solid #444; color:#888; border-radius:4px; padding:3px 10px; font-size:0.75em; cursor:pointer;">✕ Clear selection</button>
+                </div>
             </div>
         </div>
 
@@ -1952,13 +1958,38 @@
                             const index = elements[0].index;
                             const selectedDate = data.dates[index];
                             setDateFromHistogram(selectedDate);
+                            document.getElementById('histogramResetBtn').style.display = 'inline-block';
                         }
                     },
                     plugins: {
                         legend: { display: false },
                         tooltip: {
                             callbacks: {
-                                label: (item) => `${item.parsed.y} images - click to select`
+                                label: (item) => `${item.parsed.y} images - click or drag to select`
+                            }
+                        },
+                        zoom: {
+                            zoom: {
+                                drag: {
+                                    enabled: true,
+                                    backgroundColor: 'rgba(233, 69, 96, 0.15)',
+                                    borderColor: 'rgba(233, 69, 96, 0.6)',
+                                    borderWidth: 1,
+                                },
+                                mode: 'x',
+                                onZoomComplete({ chart }) {
+                                    const minTs = chart.scales.x.min;
+                                    const maxTs = chart.scales.x.max;
+                                    const toDate = d => new Date(d).toISOString().split('T')[0];
+                                    const from = toDate(minTs);
+                                    const to = toDate(maxTs);
+                                    document.getElementById('fromDate').value = from;
+                                    document.getElementById('toDate').value = to;
+                                    updateDateSummary();
+                                    openDateSelector();
+                                    loadImagesForRange();
+                                    document.getElementById('histogramResetBtn').style.display = 'inline-block';
+                                }
                             }
                         }
                     },
@@ -1980,6 +2011,11 @@
                     }
                 }
             });
+        }
+
+        function resetHistogramSelection() {
+            if (histogramChart) histogramChart.resetZoom();
+            document.getElementById('histogramResetBtn').style.display = 'none';
         }
 
         // --- Time Range Slider ---
