@@ -106,14 +106,15 @@ def _parse_lambda_response(data: dict) -> dict:
 
 
 @app.get("/api/prompts")
-async def list_prompts(all: bool = False) -> dict[str, Any]:
+async def list_prompts(all: bool = False, bucket: str = s3_service.BUCKET_NAME) -> dict[str, Any]:
     """List all prompts (names only, or all versions if all=true)."""
+    bucket_suffix = bucket.removeprefix("vibecast-")
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            url = f"{LAMBDA_API_BASE}/prompts"
+            params: dict[str, Any] = {"bucket_suffix": bucket_suffix}
             if all:
-                url += "?all=true"
-            response = await client.get(url)
+                params["all"] = "true"
+            response = await client.get(f"{LAMBDA_API_BASE}/prompts", params=params)
             if response.status_code != 200:
                 raise HTTPException(response.status_code, f"Failed to fetch prompts: {response.text}")
             return _parse_lambda_response(response.json())
@@ -126,11 +127,12 @@ async def list_prompts(all: bool = False) -> dict[str, Any]:
 
 
 @app.get("/api/prompts/{name}")
-async def get_prompt(name: str) -> dict[str, Any]:
+async def get_prompt(name: str, bucket: str = s3_service.BUCKET_NAME) -> dict[str, Any]:
     """Get latest version of a prompt."""
+    bucket_suffix = bucket.removeprefix("vibecast-")
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(f"{LAMBDA_API_BASE}/prompts/{name}")
+            response = await client.get(f"{LAMBDA_API_BASE}/prompts/{name}", params={"bucket_suffix": bucket_suffix})
             if response.status_code != 200:
                 raise HTTPException(response.status_code, f"Prompt not found: {response.text}")
             return _parse_lambda_response(response.json())
@@ -143,11 +145,12 @@ async def get_prompt(name: str) -> dict[str, Any]:
 
 
 @app.get("/api/prompts/{name}/{version}")
-async def get_prompt_version(name: str, version: int) -> dict[str, Any]:
+async def get_prompt_version(name: str, version: int, bucket: str = s3_service.BUCKET_NAME) -> dict[str, Any]:
     """Get specific version of a prompt."""
+    bucket_suffix = bucket.removeprefix("vibecast-")
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(f"{LAMBDA_API_BASE}/prompts/{name}/{version}")
+            response = await client.get(f"{LAMBDA_API_BASE}/prompts/{name}/{version}", params={"bucket_suffix": bucket_suffix})
             if response.status_code != 200:
                 raise HTTPException(response.status_code, f"Prompt version not found: {response.text}")
             return _parse_lambda_response(response.json())
@@ -162,16 +165,18 @@ async def get_prompt_version(name: str, version: int) -> dict[str, Any]:
 class PromptCreate(BaseModel):
     name: str
     content: str
+    bucket: str = s3_service.BUCKET_NAME
 
 
 @app.post("/api/prompts")
 async def save_prompt(req: PromptCreate) -> dict[str, Any]:
     """Create new prompt or push new version."""
+    bucket_suffix = req.bucket.removeprefix("vibecast-")
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
                 f"{LAMBDA_API_BASE}/prompts",
-                json={"name": req.name, "content": req.content}
+                json={"name": req.name, "content": req.content, "bucket_suffix": bucket_suffix}
             )
             if response.status_code not in (200, 201):
                 raise HTTPException(response.status_code, f"Failed to save prompt: {response.text}")

@@ -1743,6 +1743,7 @@
                 return;
             }
             currentBucket = select.value;
+            loadPrompts();
             const activeTab = document.querySelector('.tab.active');
             if (activeTab) {
                 const tab = activeTab.dataset.tab;
@@ -3099,7 +3100,7 @@
 
                     try {
                         // If we have an s3Key, use it; otherwise construct from imageKey
-                        const s3Uri = img.s3Key ? `s3://vibecast-ftp/${img.s3Key}` : `s3://vibecast-ftp/${img.imageKey}`;
+                        const s3Uri = img.s3Key ? `s3://${currentBucket}/${img.s3Key}` : `s3://${currentBucket}/${img.imageKey}`;
 
                         // Map direction label to short code
                         const directionMap = {
@@ -3921,10 +3922,12 @@
             const nameSelect = document.getElementById('promptName');
             const versionSelect = document.getElementById('promptVersion');
             try {
-                const response = await fetch('/api/prompts?all=true');
+                const response = await fetch(bucketAppend('/api/prompts?all=true'));
                 if (!response.ok) throw new Error('Failed to load prompts');
                 const data = await response.json();
                 allPrompts = data.prompts || [];
+                console.log('[prompts] loaded', allPrompts.length, 'prompts for bucket', currentBucket);
+                if (!nameSelect) { console.warn('[prompts] promptName select not found'); return; }
 
                 // Get unique prompt names
                 const names = [...new Set(allPrompts.map(p => p.name))];
@@ -3993,7 +3996,7 @@
             if (!name || name === '__new__' || version === '') return;
 
             try {
-                const response = await fetch(`/api/prompts/${name}/${version}`);
+                const response = await fetch(bucketAppend(`/api/prompts/${name}/${version}`));
                 if (!response.ok) throw new Error('Failed to load prompt');
                 const data = await response.json();
                 textarea.value = data.content || '';
@@ -4044,7 +4047,7 @@
                 const response = await fetch('/api/prompts', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: promptName, content })
+                    body: JSON.stringify({ name: promptName, content, bucket: currentBucket })
                 });
 
                 if (!response.ok) throw new Error('Failed to save prompt');
@@ -4218,38 +4221,40 @@
                     return;
                 }
 
-                // Store for modal: array of { ts, summary (dict), results }
-                crowdEntries = entries.map(([ts, val]) => ({
-                    ts,
-                    summary: (val.summary != null) ? val.summary : {},
-                    results: val.results || [],
-                }));
+                // Store for modal: array of { ts, crowd (string), level (number), results }
+                // summary can be a dict {crowd_level, crowd} or a plain string
+                crowdEntries = entries.map(([ts, val]) => {
+                    const s = val.summary;
+                    let crowd, level;
+                    if (s && typeof s === 'object') {
+                        crowd = String(s.crowd || '—');
+                        level = s.crowd_level != null ? Number(s.crowd_level) : null;
+                    } else {
+                        crowd = String(s || '—');
+                        // fall back to averaging analysis results
+                        const levels = (val.results || [])
+                            .map(r => r?.analysis?.crowdedness_level)
+                            .filter(l => l != null).map(Number);
+                        level = levels.length ? levels.reduce((a, b) => a + b, 0) / levels.length : null;
+                    }
+                    return { ts, crowd, level, results: val.results || [] };
+                });
 
-                console.log('[crowd] entries:', crowdEntries.map(e => ({ ts: e.ts, summary: e.summary })));
+                const latestCrowd = crowdEntries[0].crowd;
+                const latestLevel = crowdEntries[0].level;
 
-                // summary is now a dict: { crowd_level: int, crowd: str }
-                const latest = crowdEntries[0].summary;
-                const latestCrowd = typeof latest === 'object' ? (latest.crowd || '—') : (latest || '—');
-                const latestLevel = typeof latest === 'object' ? (latest.crowd_level != null ? Number(latest.crowd_level) : null) : null;
-
-                document.getElementById('vibeLevelText').textContent = latestCrowd.toUpperCase();
+                document.getElementById('vibeLevelText').textContent = String(latestCrowd).toUpperCase();
                 applyCrowdBallColor(latestCrowd);
 
                 // Overall trend: latest vs oldest
-                const oldest = crowdEntries[crowdEntries.length - 1].summary;
-                const oldestLevel = typeof oldest === 'object' ? (oldest.crowd_level != null ? Number(oldest.crowd_level) : null) : null;
+                const oldestLevel = crowdEntries[crowdEntries.length - 1].level;
                 const overallTrend = trendArrow(latestLevel, oldestLevel);
                 document.getElementById('vibeTrendText').textContent = overallTrend.arrow;
                 document.getElementById('vibeTrendText').style.color = overallTrend.color;
 
                 // Momentum arrow: latest vs second entry (most recent change)
                 const momentum = crowdEntries.length > 1
-                    ? (() => {
-                        const prev = crowdEntries[1].summary;
-                        const prevLevel = typeof prev === 'object' ? (prev.crowd_level != null ? Number(prev.crowd_level) : null) : null;
-                        console.log('[crowd] momentum: latest=', latestLevel, 'prev=', prevLevel);
-                        return trendArrow(latestLevel, prevLevel);
-                    })()
+                    ? trendArrow(latestLevel, crowdEntries[1].level)
                     : { arrow: '—', color: '#888' };
                 document.getElementById('vibeMomentum').textContent = momentum.arrow;
                 document.getElementById('vibeMomentum').style.color = momentum.color;
@@ -4261,15 +4266,12 @@
                 // Render the list rows with per-row trend arrows
                 listEl.innerHTML = crowdEntries.map((entry, i) => {
                     const ts = entry.ts.replace('T', ' ').slice(0, 16);
-                    const s = entry.summary;
-                    const crowd = typeof s === 'object' ? (s.crowd || '—') : (s || '—');
-                    const level = typeof s === 'object' ? (s.crowd_level ?? null) : null;
-                    // Arrow for this row: compare to next entry (which is older)
+                    const crowd = entry.crowd;
+                    const level = entry.level;
                     const next = crowdEntries[i + 1];
                     let arrow = '', arrowColor = '#888';
                     if (next) {
-                        const nextLevel = typeof next.summary === 'object' ? (next.summary.crowd_level != null ? Number(next.summary.crowd_level) : null) : null;
-                        const t = trendArrow(level, nextLevel);
+                        const t = trendArrow(level, next.level);
                         arrow = t.arrow; arrowColor = t.color;
                     }
                     return `<div style="
@@ -4282,7 +4284,7 @@
                         cursor: pointer;
                     " onclick="openCrowdEntry(${i})">
                         <span style="font-size:0.85em; color:#888; font-family:monospace;">${ts}</span>
-                        <span style="font-size:0.95em; font-weight:600; color:${crowdColor(crowd)};">${crowd.toUpperCase()}</span>
+                        <span style="font-size:0.95em; font-weight:600; color:${crowdColor(crowd)};">${String(crowd || '—').toUpperCase()}</span>
                         <span style="font-size:1.2em; color:${arrowColor};">${arrow}</span>
                     </div>`;
                 }).join('');
@@ -4304,7 +4306,7 @@
         }
 
         function crowdColor(level) {
-            const l = (level || '').toLowerCase();
+            const l = String(level || '').toLowerCase();
             if (l.includes('empty')) return '#4a9eff';
             if (l.includes('nearly')) return '#f7a800';
             if (l.includes('almost') || l.includes('medium')) return '#e05c00';
@@ -4320,7 +4322,7 @@
 
             document.getElementById('crowdModalTitle').textContent = entry.ts.replace('T', ' ').slice(0, 16);
             document.getElementById('crowdModalSummary').innerHTML =
-                `<span style="color:${crowdColor(entry.summary)};">${entry.summary.toUpperCase()}</span>`;
+                `<span style="color:${crowdColor(entry.crowd)};">${String(entry.crowd || '—').toUpperCase()}</span>`;
 
             const body = document.getElementById('crowdModalBody');
             body.innerHTML = '<div style="padding:20px; color:#666; text-align:center;">Loading images…</div>';
@@ -4347,7 +4349,7 @@
                     <div style="padding: 16px 20px;">
                         <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:10px; align-items:center;">
                             <div style="font-size:0.7em; color:#555; text-transform:uppercase; letter-spacing:0.08em;">${view}</div>
-                            <div style="font-size:1.1em; font-weight:700; color:${crowdColor(crowd)};">${crowd.toUpperCase()}</div>
+                            <div style="font-size:1.1em; font-weight:700; color:${crowdColor(crowd)};">${String(crowd).toUpperCase()}</div>
                             <div style="font-size:0.9em; color:#666;">${level} / 3</div>
                             <div style="font-size:0.75em; color:#444; margin-left:auto;">${r.model || ''}</div>
                         </div>
@@ -4367,10 +4369,8 @@
         async function navigateCrowd() {}
 
         // Initialize
-        loadAccounts().then(() => loadStats());
+        loadAccounts().then(() => { loadStats(); loadPrompts(); });
         window._modelsReady = loadModels();
-        // vibeTime is initialized by flatpickr in initVibeTab()
-        loadPrompts();
     </script>
 </body>
 </html>

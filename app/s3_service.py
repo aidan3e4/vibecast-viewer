@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any
 
 import boto3
+from botocore.config import Config
 from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
 
 BUCKET_NAME = os.getenv("S3_BUCKET", "vibecast-ftp")
@@ -288,7 +289,13 @@ def list_images_by_range(
 
 def get_presigned_url(key: str, bucket: str = BUCKET_NAME) -> str:
     """Generate presigned URL for an S3 object."""
-    s3 = get_s3_client()
+    # Use regional endpoint so the signed host matches what S3 redirects to,
+    # avoiding SignatureDoesNotMatch on buckets outside us-east-1.
+    s3 = boto3.client(
+        "s3",
+        region_name=AWS_REGION,
+        config=Config(signature_version="s3v4", s3={"addressing_style": "virtual"}),
+    )
     return s3.generate_presigned_url(
         "get_object",
         Params={"Bucket": bucket, "Key": key},
