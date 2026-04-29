@@ -205,6 +205,7 @@ async def list_accounts() -> dict[str, Any]:
 
 class CreateAccountRequest(BaseModel):
     account: str
+    password: str | None = None
 
 
 @app.post("/api/accounts")
@@ -225,12 +226,80 @@ async def create_account(req: CreateAccountRequest) -> dict[str, Any]:
     except ClientError as e:
         code = e.response["Error"]["Code"]
         if code in ("BucketAlreadyOwnedByYou", "BucketAlreadyExists"):
-            pass  # fine, already exists
+            pass
         else:
             raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+    if req.password:
+        try:
+            s3 = s3_service.get_s3_client()
+            config = {"password": req.password}
+            s3.put_object(Bucket=bucket, Key="config.json", Body=json.dumps(config), ContentType="application/json")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Bucket created but failed to save config: {e}")
+
     return {"bucket": bucket, "account": account}
+
+
+class VerifyAccountRequest(BaseModel):
+    password: str
+
+
+@app.post("/api/accounts/{bucket}/verify")
+async def verify_account(bucket: str, req: VerifyAccountRequest) -> dict[str, Any]:
+    """Verify the password for an account by checking config.json in its S3 bucket."""
+    try:
+        s3 = s3_service.get_s3_client()
+        obj = s3.get_object(Bucket=bucket, Key="config.json")
+        config = json.loads(obj["Body"].read())
+    except ClientError as e:
+        if e.response["Error"]["Code"] in ("NoSuchKey", "NoSuchBucket"):
+            # No config.json means no password set — allow access
+            return {"ok": True}
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    stored = config.get("password")
+    if not stored:
+        return {"ok": True}
+    if req.password != stored:
+        raise HTTPException(status_code=401, detail="Incorrect password")
+    return {"ok": True}
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str | None = None
+    new_password: str
+
+
+@app.post("/api/accounts/{bucket}/password")
+async def change_password(bucket: str, req: ChangePasswordRequest) -> dict[str, Any]:
+    """Change the password for an account."""
+    s3 = s3_service.get_s3_client()
+
+    # Read existing config
+    config: dict[str, Any] = {}
+    try:
+        obj = s3.get_object(Bucket=bucket, Key="config.json")
+        config = json.loads(obj["Body"].read())
+    except ClientError as e:
+        if e.response["Error"]["Code"] not in ("NoSuchKey", "NoSuchBucket"):
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # Verify old password if one is set
+    stored = config.get("password")
+    if stored and req.old_password != stored:
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+
+    config["password"] = req.new_password
+    try:
+        s3.put_object(Bucket=bucket, Key="config.json", Body=json.dumps(config), ContentType="application/json")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"ok": True}
 
 
 @app.get("/api/stats")

@@ -1073,6 +1073,32 @@
     </style>
 </head>
 <body>
+    <!-- Lock screen overlay -->
+    <div id="lockScreen" style="
+        position: fixed; inset: 0; z-index: 9999;
+        background: #0a0a1a;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 24px;
+    ">
+        <h1 style="color:#fff; font-size:2em; margin:0; letter-spacing:0.05em;">Vibecast Viewer</h1>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:12px; width:280px;">
+            <select id="lockAccountSelect" onchange="onLockAccountChange()" style="
+                width:100%; background:#16213e; color:#eee; border:1px solid #2a2a4a;
+                border-radius:8px; padding:10px 14px; font-size:1em; box-sizing:border-box; cursor:pointer;">
+                <option value="">Loading accounts…</option>
+            </select>
+            <input id="lockPassword" type="password" placeholder="Password"
+                autocomplete="current-password"
+                onkeydown="if(event.key==='Enter') submitLockScreen();"
+                style="width:100%; background:#16213e; color:#eee; border:1px solid #2a2a4a;
+                       border-radius:8px; padding:10px 14px; font-size:1em; text-align:center; box-sizing:border-box; display:none;">
+            <button onclick="submitLockScreen()" id="lockButton" style="
+                width:100%; background:#e94560; color:#fff; border:none; border-radius:8px;
+                padding:10px; font-size:1em; cursor:pointer; font-weight:600; display:none;">Unlock</button>
+            <div id="lockError" style="color:#e94560; font-size:0.85em; min-height:1.2em;"></div>
+        </div>
+    </div>
+
     <div class="header" style="display: flex; justify-content: space-between; align-items: center;">
         <div>
             <h1>Vibecast Viewer</h1>
@@ -1092,17 +1118,45 @@
             ">
                 <option value="">Loading...</option>
             </select>
+            <button onclick="showChangePassword()" title="Change password" style="
+                background:none; border:1px solid #444; border-radius:5px;
+                color:#888; cursor:pointer; font-size:1em; padding:4px 8px; line-height:1;">🔑</button>
+        </div>
+    </div>
+
+    <!-- Change password banner (hidden by default) -->
+    <div id="changePasswordBanner" style="display:none; background:#0f3460; border-bottom:1px solid #e94560; padding:10px 30px;">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <span style="color:#aaa; font-size:0.9em; white-space:nowrap;">Change password for <span id="changePasswordAccount" style="color:#fff;"></span></span>
+            <input id="changePasswordOld" type="password" placeholder="Current password (leave blank if none)"
+                   style="width:200px; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:5px; padding:5px 10px; font-size:0.9em;">
+            <input id="changePasswordNew" type="password" placeholder="New password"
+                   style="width:160px; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:5px; padding:5px 10px; font-size:0.9em;">
+            <input id="changePasswordConfirm" type="password" placeholder="Confirm new password"
+                   onkeydown="if(event.key==='Enter') submitChangePassword(); if(event.key==='Escape') cancelChangePassword();"
+                   style="width:160px; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:5px; padding:5px 10px; font-size:0.9em;">
+            <button onclick="submitChangePassword()" style="
+                background:#e94560; color:#fff; border:none; border-radius:5px;
+                padding:5px 14px; cursor:pointer; font-size:0.9em;">Save</button>
+            <button onclick="cancelChangePassword()" style="
+                background:none; color:#888; border:1px solid #444; border-radius:5px;
+                padding:5px 10px; cursor:pointer; font-size:0.9em;">Cancel</button>
+            <span id="changePasswordError" style="color:#e94560; font-size:0.85em;"></span>
+            <span id="changePasswordOk" style="color:#4caf50; font-size:0.85em; display:none;">✓ Password updated</span>
         </div>
     </div>
 
     <!-- Create account banner (hidden by default) -->
     <div id="createAccountBanner" style="display:none; background:#0f3460; border-bottom:1px solid #e94560; padding:10px 30px;">
-        <div style="display:flex; align-items:center; gap:10px; max-width:500px;">
+        <div style="display:flex; align-items:center; gap:10px; max-width:600px;">
             <span style="color:#aaa; font-size:0.9em; white-space:nowrap;">New account name</span>
             <input id="newAccountName" type="text" placeholder="e.g. reolink"
                    onkeydown="if(event.key==='Enter') submitCreateAccount(); if(event.key==='Escape') cancelCreateAccount();"
                    style="flex:1; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:5px; padding:5px 10px; font-size:0.9em;">
             <span style="color:#666; font-size:0.85em;">→ vibecast-<span id="newAccountPreview" style="color:#e94560;">…</span></span>
+            <input id="newAccountPassword" type="password" placeholder="Password (optional)"
+                   onkeydown="if(event.key==='Enter') submitCreateAccount(); if(event.key==='Escape') cancelCreateAccount();"
+                   style="width:160px; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:5px; padding:5px 10px; font-size:0.9em;">
             <button onclick="submitCreateAccount()" style="
                 background:#e94560; color:#fff; border:none; border-radius:5px;
                 padding:5px 14px; cursor:pointer; font-size:0.9em;">Create</button>
@@ -1110,6 +1164,22 @@
                 background:none; color:#888; border:1px solid #444; border-radius:5px;
                 padding:5px 10px; cursor:pointer; font-size:0.9em;">Cancel</button>
             <span id="createAccountError" style="color:#e94560; font-size:0.85em;"></span>
+        </div>
+    </div>
+
+    <div id="passwordPromptBanner" style="display:none; background:#0f3460; border-bottom:1px solid #e94560; padding:10px 30px;">
+        <div style="display:flex; align-items:center; gap:10px; max-width:500px;">
+            <span style="color:#aaa; font-size:0.9em; white-space:nowrap;">Password for <span id="passwordPromptAccount" style="color:#fff;"></span></span>
+            <input id="passwordPromptInput" type="password" placeholder="Enter password"
+                   onkeydown="if(event.key==='Enter') submitPasswordPrompt(); if(event.key==='Escape') cancelPasswordPrompt();"
+                   style="flex:1; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:5px; padding:5px 10px; font-size:0.9em;">
+            <button onclick="submitPasswordPrompt()" style="
+                background:#e94560; color:#fff; border:none; border-radius:5px;
+                padding:5px 14px; cursor:pointer; font-size:0.9em;">Unlock</button>
+            <button onclick="cancelPasswordPrompt()" style="
+                background:none; color:#888; border:1px solid #444; border-radius:5px;
+                padding:5px 10px; cursor:pointer; font-size:0.9em;">Cancel</button>
+            <span id="passwordPromptError" style="color:#e94560; font-size:0.85em;"></span>
         </div>
     </div>
 
@@ -1480,7 +1550,7 @@
                     transition: background 0.8s ease, box-shadow 0.8s ease;
                 ">
                     <span id="vibeLevelText" style="font-size: 1.6em; font-weight: 800; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,0.4); letter-spacing: 0.05em;">—</span>
-                    <span id="vibeTrendText" style="font-size: 1.8em; line-height: 1; margin-top: 4px; text-shadow: 0 2px 8px rgba(0,0,0,0.4);">—</span>
+                    <span id="vibeTrendText" style="display:none;"></span>
                 </div>
 
                 <div id="crowdList" style="width: 100%; max-width: 360px; margin-top: 8px;"></div>
@@ -1734,22 +1804,117 @@
             select.appendChild(sentinel);
         }
 
+        let _pendingBucket = null;
+
         function onAccountChange() {
             const select = document.getElementById('accountSelect');
             if (select.value === '__create__') {
-                // Revert selection to current bucket, show creation UI
                 select.value = currentBucket;
                 showCreateAccount();
                 return;
             }
-            currentBucket = select.value;
+            const chosen = select.value;
+            if (chosen === currentBucket) return;
+            // Revert select visually until password verified
+            select.value = currentBucket;
+            _pendingBucket = chosen;
+            showPasswordPrompt(chosen);
+        }
+
+        function showPasswordPrompt(bucket) {
+            const account = bucket.startsWith('vibecast-') ? bucket.slice('vibecast-'.length) : bucket;
+            document.getElementById('passwordPromptAccount').textContent = account;
+            document.getElementById('passwordPromptInput').value = '';
+            document.getElementById('passwordPromptError').textContent = '';
+            document.getElementById('passwordPromptBanner').style.display = 'block';
+            document.getElementById('passwordPromptInput').focus();
+        }
+
+        function cancelPasswordPrompt() {
+            document.getElementById('passwordPromptBanner').style.display = 'none';
+            _pendingBucket = null;
+        }
+
+        async function submitPasswordPrompt() {
+            const password = document.getElementById('passwordPromptInput').value;
+            const errorEl = document.getElementById('passwordPromptError');
+            errorEl.textContent = '';
+            if (!_pendingBucket) return;
+
+            try {
+                const resp = await fetch(`/api/accounts/${encodeURIComponent(_pendingBucket)}/verify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password }),
+                });
+                if (!resp.ok) {
+                    const data = await resp.json().catch(() => ({}));
+                    errorEl.textContent = data.detail || 'Incorrect password';
+                    return;
+                }
+            } catch (e) {
+                errorEl.textContent = 'Request failed: ' + e.message;
+                return;
+            }
+
+            // Password accepted — switch account
+            document.getElementById('passwordPromptBanner').style.display = 'none';
+            currentBucket = _pendingBucket;
+            _pendingBucket = null;
+            document.getElementById('accountSelect').value = currentBucket;
             loadPrompts();
             const activeTab = document.querySelector('.tab.active');
             if (activeTab) {
                 const tab = activeTab.dataset.tab;
                 if (tab === 'explorer') loadStats();
                 if (tab === 'results') { loadResultStats(); loadAllResults(); }
+                if (tab === 'vibe') initVibeTab();
             }
+        }
+
+        function showChangePassword() {
+            const account = currentBucket.startsWith('vibecast-') ? currentBucket.slice('vibecast-'.length) : currentBucket;
+            document.getElementById('changePasswordAccount').textContent = account;
+            document.getElementById('changePasswordOld').value = '';
+            document.getElementById('changePasswordNew').value = '';
+            document.getElementById('changePasswordConfirm').value = '';
+            document.getElementById('changePasswordError').textContent = '';
+            document.getElementById('changePasswordOk').style.display = 'none';
+            document.getElementById('changePasswordBanner').style.display = 'block';
+            document.getElementById('changePasswordOld').focus();
+        }
+
+        function cancelChangePassword() {
+            document.getElementById('changePasswordBanner').style.display = 'none';
+        }
+
+        async function submitChangePassword() {
+            const oldPw = document.getElementById('changePasswordOld').value;
+            const newPw = document.getElementById('changePasswordNew').value;
+            const confirmPw = document.getElementById('changePasswordConfirm').value;
+            const errorEl = document.getElementById('changePasswordError');
+            const okEl = document.getElementById('changePasswordOk');
+            errorEl.textContent = '';
+            okEl.style.display = 'none';
+
+            if (!newPw) { errorEl.textContent = 'New password cannot be empty.'; return; }
+            if (newPw !== confirmPw) { errorEl.textContent = 'Passwords do not match.'; return; }
+
+            try {
+                const resp = await fetch(`/api/accounts/${encodeURIComponent(currentBucket)}/password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ old_password: oldPw || null, new_password: newPw }),
+                });
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok) { errorEl.textContent = data.detail || 'Failed to update password.'; return; }
+            } catch (e) {
+                errorEl.textContent = 'Request failed: ' + e.message;
+                return;
+            }
+
+            okEl.style.display = 'inline';
+            setTimeout(() => cancelChangePassword(), 1500);
         }
 
         function showCreateAccount() {
@@ -1767,12 +1932,14 @@
 
         function cancelCreateAccount() {
             document.getElementById('createAccountBanner').style.display = 'none';
+            document.getElementById('newAccountPassword').value = '';
         }
 
         async function submitCreateAccount() {
             const input = document.getElementById('newAccountName');
             const errorEl = document.getElementById('createAccountError');
             const account = input.value.trim().toLowerCase();
+            const password = document.getElementById('newAccountPassword').value.trim() || null;
             errorEl.textContent = '';
             if (!account) { errorEl.textContent = 'Enter a name.'; return; }
 
@@ -1780,7 +1947,7 @@
                 const resp = await fetch('/api/accounts', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ account }),
+                    body: JSON.stringify({ account, password }),
                 });
                 const data = await resp.json();
                 if (!resp.ok) { errorEl.textContent = data.detail || 'Error creating account.'; return; }
@@ -4368,9 +4535,96 @@
         // Keep keyboard Escape working; remove old nav functions no longer needed
         async function navigateCrowd() {}
 
-        // Initialize
-        loadAccounts().then(() => { loadStats(); loadPrompts(); });
-        window._modelsReady = loadModels();
+        function initApp(selectBucket) {
+            loadAccounts(selectBucket).then(() => { loadStats(); loadPrompts(); });
+            window._modelsReady = loadModels();
+        }
+
+        // Lock screen
+        let _lockAccounts = [];
+
+        async function onLockAccountChange() {
+            const bucket = document.getElementById('lockAccountSelect').value;
+            const errorEl = document.getElementById('lockError');
+            errorEl.textContent = '';
+            document.getElementById('lockPassword').value = '';
+
+            if (!bucket) return;
+
+            // Check if this account needs a password
+            try {
+                const resp = await fetch(`/api/accounts/${encodeURIComponent(bucket)}/verify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: '' }),
+                });
+                if (resp.ok) {
+                    // No password — unlock immediately with this account
+                    document.getElementById('lockScreen').style.display = 'none';
+                    initApp(bucket);
+                    return;
+                }
+            } catch (e) { /* show password input */ }
+
+            // Password required — show input
+            document.getElementById('lockPassword').style.display = 'block';
+            document.getElementById('lockButton').style.display = 'block';
+            document.getElementById('lockPassword').focus();
+        }
+
+        async function submitLockScreen() {
+            const bucket = document.getElementById('lockAccountSelect').value;
+            const password = document.getElementById('lockPassword').value;
+            const errorEl = document.getElementById('lockError');
+            errorEl.textContent = '';
+            if (!bucket) { errorEl.textContent = 'Select an account.'; return; }
+
+            try {
+                const resp = await fetch(`/api/accounts/${encodeURIComponent(bucket)}/verify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password }),
+                });
+                if (!resp.ok) {
+                    const data = await resp.json().catch(() => ({}));
+                    errorEl.textContent = data.detail || 'Incorrect password';
+                    document.getElementById('lockPassword').value = '';
+                    document.getElementById('lockPassword').focus();
+                    return;
+                }
+            } catch (e) {
+                errorEl.textContent = 'Request failed: ' + e.message;
+                return;
+            }
+
+            document.getElementById('lockScreen').style.display = 'none';
+            initApp(bucket);
+        }
+
+        // Boot: fetch accounts and populate lock screen selector
+        (async () => {
+            try {
+                const r = await fetch('/api/accounts');
+                const d = await r.json();
+                _lockAccounts = d.accounts || [];
+                const defaultBucket = d.default || (_lockAccounts[0]?.bucket) || '';
+
+                const sel = document.getElementById('lockAccountSelect');
+                sel.innerHTML = '';
+                _lockAccounts.forEach(a => {
+                    const opt = document.createElement('option');
+                    opt.value = a.bucket;
+                    opt.textContent = a.account || a.bucket;
+                    if (a.bucket === defaultBucket) opt.selected = true;
+                    sel.appendChild(opt);
+                });
+
+                // Trigger check for the default account
+                await onLockAccountChange();
+            } catch (e) {
+                document.getElementById('lockError').textContent = 'Could not reach server.';
+            }
+        })();
     </script>
 </body>
 </html>
